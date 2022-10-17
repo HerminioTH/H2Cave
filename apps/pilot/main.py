@@ -19,34 +19,47 @@ MPa = 1e6
 GPa = 1e9
 
 def axial_stress(t):
-	if t <= 911*hour:
-		return 5*MPa
-	elif 911*hour < t and t <= 1637.1*hour:
-		return 10*MPa
-	else:
-		return 15*MPa
-
-def compute_total_strain(eps_tot, u, TS):
-	eps_tot.assign(local_projection(epsilon(u), TS))
-
-def compute_elastic_strain(eps_e, eps_tot, eps_v, eps_cr, TS):
-	eps_e.assign(local_projection(eps_tot - eps_cr - eps_v, TS))
-
-def compute_theta_tensor(tensor, tensor_old, theta, TS):
-	return theta*tensor_old + (1 - theta)*tensor
-	# return local_projection(theta*tensor_old + (1 - theta)*tensor, TS)
+	return 12*MPa
+	# if t <= 911*hour:
+	# 	return 5*MPa
+	# elif 911*hour < t and t <= 1637.1*hour:
+	# 	return 10*MPa
+	# else:
+	# 	return 15*MPa
 
 def compute_error(u, u_k):
 	return np.linalg.norm(u.vector() - u_k.vector()) / np.linalg.norm(u.vector())
 
 def main():
+
+	# Define settings
+	settings = {
+		"Time" : {
+			"timeStep": 10*hour,
+			"finalTime": 800*hour,
+			"theta": 0.5,
+		},
+		"Viscoelastic" : {
+			"active": True,
+			"E0": 2*GPa,
+			"nu0": 0.3,
+			"E1": 2*GPa,
+			"nu1": 0.3,
+			"eta": 5e14
+		},
+		"DislocationCreep" : {
+			"active": True,
+			"A": 5.2e-36,
+			"n": 5.0,
+			"T": 298
+		}
+	}
+
 	# Transient settings
 	t = 0
-	dt0 = 10*hour
-	# t_final = 200*dt0
-	t_final = 2500*hour
-	dt = dt0
-	theta = 0.5
+	dt = settings["Time"]["timeStep"]
+	t_final = settings["Time"]["finalTime"]
+	theta = settings["Time"]["theta"]
 
 	# Load grid
 	grid_folder = os.path.join("..", "..", "grids", "quarter_cylinder_0")
@@ -86,52 +99,27 @@ def main():
 	u_k = Function(V)
 	u_k.rename("Displacement", "m")
 
-	# Define initial tensors
-	degree = V.ufl_element().degree()
+	# # Define initial tensors
 	TS = TensorFunctionSpace(grid.mesh, "DG", 0)
-	zero_tensor = Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","0.0")), degree=0)
-
-	eps_e = local_projection(zero_tensor, TS)
-	eps_tot = local_projection(zero_tensor, TS)
-	eps_tot_old = local_projection(zero_tensor, TS)
-	eps_cr = local_projection(zero_tensor, TS)
-	eps_cr_old = local_projection(zero_tensor, TS)
-	eps_cr_rate = local_projection(zero_tensor, TS)
-	eps_cr_rate_old = local_projection(zero_tensor, TS)
-	eps_v = local_projection(zero_tensor, TS)
-	eps_v_old = local_projection(zero_tensor, TS)
-	stress = local_projection(zero_tensor, TS)
 
 	# Create tensor savers
 	saver_eps_e = TensorSaver("eps_e", dx)
 	saver_eps_tot = TensorSaver("eps_tot", dx)
-	saver_eps_v = TensorSaver("eps_ve", dx)
+	saver_eps_v = TensorSaver("eps_v", dx)
 	saver_eps_cr = TensorSaver("eps_cr", dx)
 	saver_eps_cr_rate = TensorSaver("eps_cr_rate", dx)
 	saver_stress = TensorSaver("stress", dx)
 
-	# Define elastic model
-	E0 = Constant(2*GPa)
-	nu0 = Constant(0.3)
-	model_e = ElasticModel(E0, nu0, du, v, dx)
-	model_e.build_A()
-
-	# Define viscoelastic model (Voigt)
-	E1 = Constant(2*GPa)
-	nu1 = Constant(0.3)
-	eta = Constant(5e14)
-	model_v = VoigtModel(nu0, nu1, E0, E1, eta, theta, du, v, dx)
+	# Define viscoelastic model
+	model_v = ViscoElasticModel(settings["Viscoelastic"], theta, du, v, dx, TS)
 	model_v.compute_matrices(dt)
 
 	# Define creep model (Power-Law)
-	B = Constant(5.2e-36)
-	# B = Constant(0)
-	n = Constant(5.0)
-	T = Constant(298)
-	model_c = CreepDislocation(B, n, T, theta, model_e, du, v, dx)
+	model_c = CreepDislocation(settings["DislocationCreep"], theta, model_v.C0, du, v, dx, TS)
 
 	# Initialize matrix
-	A = model_e.A
+	model_v.build_A_elastic()
+	A = model_v.A_elastic
 
 	# Apply Neumann boundary conditions
 	L_bc = -axial_stress(t)*v_n*ds(grid.dolfin_tags[grid.boundary_dim]["TOP"])
@@ -143,35 +131,33 @@ def main():
 	solve(A, u.vector(), b, "cg", "ilu")
 
 	# Compute total strain
-	compute_total_strain(eps_tot, u, TS)
-
-	# Update total strain
-	eps_tot_old.assign(eps_tot)
+	model_v.compute_total_strain(u)
 
 	# Compute elastic strain
-	compute_elastic_strain(eps_e, eps_tot, eps_v, eps_cr, TS)
+	eps_ie = model_c.eps_cr
+	model_v.compute_elastic_strain(eps_ie)
 
 	# Compute stress
-	model_e.compute_stress(stress, eps_e, TS)
-
-	# Compute time integration tensors
-	eps_tot_theta = compute_theta_tensor(eps_tot, eps_tot_old, theta, TS)
-	eps_cr_theta = compute_theta_tensor(eps_cr, eps_cr_old, theta, TS)
-
-	# Compute viscous strain
-	model_v.compute_viscous_strain(eps_v, eps_v_old, eps_tot_theta, eps_cr_theta, TS)
+	model_v.compute_stress()
 
 	# Record tensors
-	saver_eps_e.record_average(eps_e, t)
-	saver_eps_v.record_average(eps_v, t)
-	saver_eps_cr.record_average(eps_cr, t)
-	saver_eps_cr_rate.record_average(eps_cr_rate, t)
-	saver_eps_tot.record_average(eps_tot, t)
-	saver_stress.record_average(stress, t)
+	saver_eps_e.record_average(model_v.eps_e, t)
+	saver_eps_v.record_average(model_v.eps_v, t)
+	saver_eps_cr.record_average(model_c.eps_cr, t)
+	saver_eps_cr_rate.record_average(model_c.eps_cr_rate, t)
+	saver_eps_tot.record_average(model_v.eps_tot, t)
+	saver_stress.record_average(model_v.stress, t)
+
+	# Compute viscous strain
+	eps_ie_old = model_c.eps_cr_old
+	model_v.compute_viscous_strain(eps_ie, eps_ie_old)
+
+	# Update total strain
+	model_v.update()
 
 	# Include viscous terms for transient simulation
 	model_v.build_A()
-	A += model_v.A
+	# A += model_v.A
 
 	while t < t_final:
 		# Update time
@@ -181,7 +167,6 @@ def main():
 		# Apply Neumann boundary conditions
 		L_bc = -axial_stress(t)*v_n*ds(grid.dolfin_tags[grid.boundary_dim]["TOP"])
 		b_bc = assemble(L_bc)
-		b = b_bc
 
 		# Iteration settings
 		ite = 0
@@ -190,19 +175,17 @@ def main():
 		error_old = error
 
 		# Compute creep strain
-		model_c.compute_creep_strain(eps_cr, eps_cr_old, eps_cr_rate_old, eps_cr_rate, dt, TS)
-
+		model_c.compute_creep_strain(model_v.stress, dt)
 
 		while error > tol:
-
 			b = 0
 
 			# # Build creep rhs
-			model_c.build_b(eps_cr)
+			model_c.build_b()
 			b += model_c.b
 
 			# Build viscoelastic rhs
-			model_v.build_b(eps_tot_old, eps_cr, eps_cr_old, eps_v_old)
+			model_v.build_b(model_c.eps_cr, model_c.eps_cr_old)
 			b += model_v.b
 
 			# Boundary condition rhs
@@ -212,8 +195,8 @@ def main():
 			[bc.apply(A, b) for bc in bcs]
 
 			# Solve linear system
-			solve(A, u.vector(), b)
-			# solve(A, u.vector(), b, "cg", "ilu")
+			# solve(A, u.vector(), b)
+			solve(A, u.vector(), b, "cg", "ilu")
 
 			# Compute error
 			error = compute_error(u, u_k)
@@ -226,52 +209,43 @@ def main():
 			u_k.assign(u)
 
 			# Compute total strain
-			compute_total_strain(eps_tot, u, TS)
+			model_v.compute_total_strain(u)
 
 			# Compute elastic strain
-			compute_elastic_strain(eps_e, eps_tot, eps_v, eps_cr, TS)
+			model_v.compute_elastic_strain(model_c.eps_cr)
 
 			# Compute stress
-			model_e.compute_stress(stress, eps_e, TS)
-
-			# Compute creep strain rate
-			model_c.compute_creep_strain_rate(eps_cr_rate, stress, TS)
+			model_v.compute_stress()
 
 			# Compute creep strain
-			model_c.compute_creep_strain(eps_cr, eps_cr_old, eps_cr_rate_old, eps_cr_rate, dt, TS)
+			model_c.compute_creep_strain(model_v.stress, dt)
 
 			# Increase iteration
 			ite += 1
 
-		# Compute time integration tensors
-		eps_tot_theta = compute_theta_tensor(eps_tot, eps_tot_old, theta, TS)
-		eps_cr_theta = compute_theta_tensor(eps_cr, eps_cr_old, theta, TS)
-
 		# Compute viscous strain
-		model_v.compute_viscous_strain(eps_v, eps_v_old, eps_tot_theta, eps_cr_theta, TS)
+		model_v.compute_viscous_strain(model_c.eps_cr, model_c.eps_cr_old)
 
 		# Update old variables
-		eps_cr_rate_old.assign(eps_cr_rate)
-		eps_cr_old.assign(eps_cr)
-		eps_v_old.assign(eps_v)
-		eps_tot_old.assign(eps_tot)
+		model_v.update()
+		model_c.update()
 
 		# Record tensors
-		saver_eps_e.record_average(eps_e, t)
-		saver_eps_v.record_average(eps_v, t)
-		saver_eps_cr.record_average(eps_cr, t)
-		saver_eps_cr_rate.record_average(eps_cr_rate, t)
-		saver_eps_tot.record_average(eps_tot, t)
-		saver_stress.record_average(stress, t)
+		saver_eps_e.record_average(model_v.eps_e, t)
+		saver_eps_v.record_average(model_v.eps_v, t)
+		saver_eps_cr.record_average(model_c.eps_cr, t)
+		saver_eps_cr_rate.record_average(model_c.eps_cr_rate, t)
+		saver_eps_tot.record_average(model_v.eps_tot, t)
+		saver_stress.record_average(model_v.stress, t)
 
-		# Save results
-		# vtk_displacement << (u, t)
-		# vtk_stress << (stress, t)
-		# vtk_strain_e << (eps_e, t)
-		# vtk_strain_v << (eps_v, t)
-		# vtk_strain_tot << (eps_tot, t)
-		# vtk_strain_cr << (eps_cr, t)
-		# vtk_strain_cr_rate << (eps_cr_rate, t)
+	# 	# Save results
+	# 	# vtk_displacement << (u, t)
+	# 	# vtk_stress << (stress, t)
+	# 	# vtk_strain_e << (eps_e, t)
+	# 	# vtk_strain_v << (eps_v, t)
+	# 	# vtk_strain_tot << (eps_tot, t)
+	# 	# vtk_strain_cr << (eps_cr, t)
+	# 	# vtk_strain_cr_rate << (eps_cr_rate, t)
 
 	# Save tensor results
 	saver_eps_e.save(os.path.join(output_folder, "numeric"))
