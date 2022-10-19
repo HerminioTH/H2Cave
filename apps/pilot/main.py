@@ -20,12 +20,6 @@ GPa = 1e9
 
 def axial_stress(t):
 	return 12*MPa
-	# if t <= 911*hour:
-	# 	return 5*MPa
-	# elif 911*hour < t and t <= 1637.1*hour:
-	# 	return 10*MPa
-	# else:
-	# 	return 15*MPa
 
 def compute_error(u, u_k):
 	return np.linalg.norm(u.vector() - u_k.vector()) / np.linalg.norm(u.vector())
@@ -34,9 +28,13 @@ def main():
 
 	# Define settings
 	settings = {
+		"Paths" : {
+			"Output": "output/case_0",
+			"Grid": "../../grids/quarter_cylinder_0",
+		},
 		"Time" : {
 			"timeStep": 10*hour,
-			"finalTime": 800*hour,
+			"finalTime": 30*hour,
 			"theta": 0.5,
 		},
 		"Viscoelastic" : {
@@ -62,12 +60,12 @@ def main():
 	theta = settings["Time"]["theta"]
 
 	# Load grid
-	grid_folder = os.path.join("..", "..", "grids", "quarter_cylinder_0")
+	grid_folder = os.path.join(*settings["Paths"]["Grid"].split("/"))
 	geometry_name = "geom"
 	grid = GridHandler(geometry_name, grid_folder)
 
 	# Define output folder
-	output_folder = os.path.join("output", "case_0")
+	output_folder = os.path.join(*settings["Paths"]["Output"].split("/"))
 
 	# Define function space
 	V = VectorFunctionSpace(grid.mesh, "CG", 1)
@@ -129,6 +127,7 @@ def main():
 	# Solve instantaneous elastic problem
 	[bc.apply(A, b) for bc in bcs]
 	solve(A, u.vector(), b, "cg", "ilu")
+
 
 	# Compute total strain
 	model_v.compute_total_strain(u)

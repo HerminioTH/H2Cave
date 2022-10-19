@@ -77,15 +77,15 @@ def plot_exp(ax, axins=None):
 def plot_num(ax1, file_name):
 	output_folder = os.path.join("output", f"{file_name}", "numeric")
 	eps_tot = pd.read_excel(os.path.join(output_folder, "eps_tot.xlsx"))
-	eps_ve = pd.read_excel(os.path.join(output_folder, "eps_v.xlsx"))
-	eps_e = pd.read_excel(os.path.join(output_folder, "eps_e.xlsx"))
-	eps_cr = pd.read_excel(os.path.join(output_folder, "eps_cr.xlsx"))
+	# eps_ve = pd.read_excel(os.path.join(output_folder, "eps_v.xlsx"))
+	# eps_e = pd.read_excel(os.path.join(output_folder, "eps_e.xlsx"))
+	# eps_cr = pd.read_excel(os.path.join(output_folder, "eps_cr.xlsx"))
 	# eps_ve["22"] += eps_e["22"]
 
 	step = 1
 	ax1.plot(eps_tot["Time"][::step]/hour, 100*abs(eps_tot["22"][::step]), ".", color="0.15", label=r"$\varepsilon_{tot}$", ms=8, mfc="steelblue")
-	ax1.plot(eps_ve["Time"][::step]/hour, 100*abs(eps_ve["22"][::step]), ".", color="0.15", label=r"$\varepsilon_{v}$", ms=8, mfc="lightcoral")
-	ax1.plot(eps_e["Time"][::step]/hour, 100*abs(eps_e["22"][::step]), ".", color="0.15", label=r"$\varepsilon_{e}$", ms=8, mfc="gold")
+	# ax1.plot(eps_ve["Time"][::step]/hour, 100*abs(eps_ve["22"][::step]), ".", color="0.15", label=r"$\varepsilon_{v}$", ms=8, mfc="lightcoral")
+	# ax1.plot(eps_e["Time"][::step]/hour, 100*abs(eps_e["22"][::step]), ".", color="0.15", label=r"$\varepsilon_{e}$", ms=8, mfc="gold")
 	# ax1.plot(eps_cr["Time"][::step]/hour, 100*abs(eps_cr["22"][::step]), ".-", color="0.15", label=r"$\varepsilon_{cr}$", ms=8, mfc="#ac84cbff")
 	ax1.set_xlabel("Time [hour]", size=12, fontname="serif")
 	ax1.set_ylabel("Axial Strain [%]", size=12, fontname="serif")
@@ -98,7 +98,7 @@ def main():
 	fig, (ax1) = plt.subplots(1, 1, figsize=(5, 4))
 	fig.subplots_adjust(top=0.935, bottom=0.125, left=0.120, right=0.985, hspace=0.2, wspace=0.2)
 
-	folder = "case_0"
+	folder = "case_1"
 	plot_num(ax1, folder)
 
 	ax1.legend(loc=2, shadow=True, fancybox=True, ncol=1)

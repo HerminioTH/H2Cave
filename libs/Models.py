@@ -77,6 +77,7 @@ class ViscoElasticModel(BaseModel):
 
 		self.__initialize_tensors()
 		self.__load_props()
+		self.compute_C0_C1()
 
 	def build_A_elastic(self):
 		a_form = inner(sigma(self.C0, epsilon(self.du)), epsilon(self.v))*self.dx
@@ -120,6 +121,13 @@ class ViscoElasticModel(BaseModel):
 			form_v -= dot(self.C3, strain2voigt(eps_ie_theta))
 		self.eps_v.assign(local_projection(voigt2stress(form_v), self.TS))
 
+	def compute_C0_C1(self):
+		# Define C0 and C1
+		C0_sy = self.__constitutive_matrix_sy(self.E0, self.nu0)
+		C1_sy = self.__constitutive_matrix_sy(self.E1, self.nu1)
+		self.C0 = as_matrix(Constant(np.array(C0_sy).astype(np.float64)))
+		self.C1 = as_matrix(Constant(np.array(C1_sy).astype(np.float64)))
+
 	def compute_matrices(self, dt):
 		# Define C0 and C1
 		C0_sy = self.__constitutive_matrix_sy(self.E0, self.nu0)
@@ -138,7 +146,11 @@ class ViscoElasticModel(BaseModel):
 		C5_sy = C0_sy*C3_sy
 		CT_sy = C0_sy - self.__multiply(1-self.theta, C5_sy)
 
-		self.__initialize_matrices(C0_sy, C1_sy, C2_sy, C3_sy, C4_sy, C5_sy, CT_sy)
+		self.C2 = as_matrix(Constant(np.array(C2_sy).astype(np.float64)))
+		self.C3 = as_matrix(Constant(np.array(C3_sy).astype(np.float64)))
+		self.C4 = as_matrix(Constant(np.array(C4_sy).astype(np.float64)))
+		self.C5 = as_matrix(Constant(np.array(C5_sy).astype(np.float64)))
+		self.CT = as_matrix(Constant(np.array(CT_sy).astype(np.float64)))
 
 	def __constitutive_matrix_sy(self, E, nu):
 		lame = E*nu/((1+nu)*(1-2*nu))
@@ -151,15 +163,6 @@ class ViscoElasticModel(BaseModel):
 								0.,			0.,				0.,				0.,		x*G,	0.,
 								0.,			0.,				0.,				0.,		0.,		x*G])
 		return M
-
-	def __initialize_matrices(self, C0_sy, C1_sy, C2_sy, C3_sy, C4_sy, C5_sy, CT_sy):
-		self.C0 = as_matrix(Constant(np.array(C0_sy).astype(np.float64)))
-		self.C1 = as_matrix(Constant(np.array(C1_sy).astype(np.float64)))
-		self.C2 = as_matrix(Constant(np.array(C2_sy).astype(np.float64)))
-		self.C3 = as_matrix(Constant(np.array(C3_sy).astype(np.float64)))
-		self.C4 = as_matrix(Constant(np.array(C4_sy).astype(np.float64)))
-		self.C5 = as_matrix(Constant(np.array(C5_sy).astype(np.float64)))
-		self.CT = as_matrix(Constant(np.array(CT_sy).astype(np.float64)))
 
 	def __multiply(self, a, C):
 		x = sy.Symbol("x")
