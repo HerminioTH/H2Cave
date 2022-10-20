@@ -34,7 +34,7 @@ def main():
 		},
 		"Time" : {
 			"timeStep": 10*hour,
-			"finalTime": 30*hour,
+			"finalTime": 20*hour,
 			"theta": 0.5,
 		},
 		"Viscoelastic" : {
@@ -128,9 +128,9 @@ def main():
 	[bc.apply(A, b) for bc in bcs]
 	solve(A, u.vector(), b, "cg", "ilu")
 
-
 	# Compute total strain
 	model_v.compute_total_strain(u)
+
 
 	# Compute elastic strain
 	eps_ie = model_c.eps_cr
@@ -161,7 +161,7 @@ def main():
 	while t < t_final:
 		# Update time
 		t += dt
-		print(t)
+		print(t/hour)
 
 		# Apply Neumann boundary conditions
 		L_bc = -axial_stress(t)*v_n*ds(grid.dolfin_tags[grid.boundary_dim]["TOP"])

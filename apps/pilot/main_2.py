@@ -22,9 +22,6 @@ GPa = 1e9
 def axial_stress(t):
 	return 12*MPa
 
-def compute_error(u, u_k):
-	return np.linalg.norm(u.vector() - u_k.vector()) / np.linalg.norm(u.vector())
-
 class SaltModel():
 	def __init__(self, grid, settings):
 		self.grid = grid
@@ -76,7 +73,7 @@ class SaltModel():
 		self.bcs.append(DirichletBC(self.V.sub(0), Constant(0.0), self.grid.boundaries, self.grid.dolfin_tags[self.grid.boundary_dim]["SIDE_X"]))
 
 	def update_Neumann_BC(self, time_handler):
-		L_bc = -axial_stress(time_handler.time)*self.v_n*ds(self.grid.dolfin_tags[self.grid.boundary_dim]["TOP"])
+		L_bc = -axial_stress(time_handler.time)*self.v_n*self.ds(self.grid.dolfin_tags[self.grid.boundary_dim]["TOP"])
 		self.b_bc = assemble(L_bc)
 
 	def solve_elastic_model(self, time_handler):
@@ -87,14 +84,11 @@ class SaltModel():
 		# Apply Neumann boundary conditions
 		self.update_Neumann_BC(time_handler)
 		b = self.b_bc
-		# L_bc = -23*MPa*self.v_n*ds(self.grid.dolfin_tags[self.grid.boundary_dim]["TOP"])
-		# b = assemble(L_bc)
 
 		# Solve instantaneous elastic problem
 		[bc.apply(A, b) for bc in self.bcs]
 		solve(A, self.u.vector(), b, "cg", "ilu")
 
-		print(np.linalg.norm(self.u.vector()))
 
 	def solve_mechanics(self):
 		# Initialize rhs
@@ -160,7 +154,7 @@ def main():
 		"Time" : {
 			"timeList": None,
 			"timeStep": 10*hour,
-			"finalTime": 30*hour,
+			"finalTime": 800*hour,
 			"theta": 0.5,
 		},
 		"Viscoelastic" : {
@@ -208,66 +202,75 @@ def main():
 	# Compute stress
 	salt.compute_stress()
 
+	# Compute viscous strain
+	salt.update_matrices(time_handler)
+	salt.compute_viscous_strain()
+	salt.model_v.update()
+	salt.assemble_matrix()
+
 	# Save results
 	saver_eps_tot.record_average(salt.model_v.eps_tot, time_handler.time)
 
-	# # Time marching
-	# while not time_handler.is_final_time_reached():
+	# Time marching
+	while not time_handler.is_final_time_reached():
 
-	# 	# Update time
-	# 	time_handler.advance_time()
-	# 	print()
-	# 	print(time_handler.time/hour)
+		# Update time
+		time_handler.advance_time()
+		print()
+		print(time_handler.time/hour)
 
-	# 	# Update constitutive matrices
-	# 	salt.update_matrices(time_handler)
+		# Update constitutive matrices
+		salt.update_matrices(time_handler)
 
-	# 	# Assemble stiffness matrix
-	# 	salt.assemble_matrix()
+		# Assemble stiffness matrix
+		salt.assemble_matrix()
 
-	# 	# Compute creep
-	# 	salt.compute_creep(time_handler)
+		# Compute creep
+		salt.compute_creep(time_handler)
 
-	# 	# Update Neumann BC
-	# 	salt.update_Neumann_BC(time_handler)
+		# Update Neumann BC
+		salt.update_Neumann_BC(time_handler)
 
-	# 	# Iteration settings
-	# 	ite = 0
-	# 	tol = 1e-9
-	# 	error = 2*tol
-	# 	error_old = error
+		# Iteration settings
+		ite = 0
+		tol = 1e-9
+		error = 2*tol
+		error_old = error
 
-	# 	while error > tol:
-	# 		# Solve mechanical problem
-	# 		salt.solve_mechanics()
+		while error > tol:
+			# Solve mechanical problem
+			salt.solve_mechanics()
 
-	# 		# Compute error
-	# 		error = salt.compute_error()
-	# 		print(ite, error)
+			# Compute error
+			error = salt.compute_error()
+			print(ite, error)
 
-	# 		# Compute total strain
-	# 		salt.compute_total_strain()
+			# Compute total strain
+			salt.compute_total_strain()
 
-	# 		# Compute elastic strin
-	# 		salt.compute_elastic_strain()
+			# Compute elastic strin
+			salt.compute_elastic_strain()
 
-	# 		# Compute stress
-	# 		salt.compute_stress()
+			# Compute stress
+			salt.compute_stress()
 
-	# 		# Compute creep
-	# 		salt.compute_creep(time_handler)
+			# Compute creep
+			salt.compute_creep(time_handler)
 
-	# 		# Increase iteration
-	# 		ite += 1
+			# Increase iteration
+			ite += 1
 
-	# 	# Update old strins
-	# 	salt.update_old_strains()
+		# Compute viscous strain
+		salt.compute_viscous_strain()
 
-	# 	# Save results
-	# 	saver_eps_tot.record_average(salt.model_v.eps_tot, time_handler.time)
+		# Update old strins
+		salt.update_old_strains()
 
-	# # Write results
-	# saver_eps_tot.save(os.path.join(output_folder, "numeric"))
+		# Save results
+		saver_eps_tot.record_average(salt.model_v.eps_tot, time_handler.time)
+
+	# Write results
+	saver_eps_tot.save(os.path.join(output_folder, "numeric"))
 
 
 

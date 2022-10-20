@@ -84,11 +84,11 @@ class ViscoElasticModel(BaseModel):
 		self.A_elastic = assemble(a_form)
 
 	def build_A(self):
-		self.A = self.A_elastic
 		if self.props["active"]:
 			if self.theta != 1.0:
 				a_form = inner(-sigma((1 - self.theta)*self.C5, epsilon(self.du)), epsilon(self.v))*self.dx
-				self.A += assemble(a_form)
+				# self.A += assemble(a_form)
+				self.A = self.A_elastic + assemble(a_form)
 
 	def build_b(self, eps_ie=None, eps_ie_old=None):
 		if self.props["active"]:
