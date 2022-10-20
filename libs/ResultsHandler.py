@@ -2,6 +2,43 @@ import meshio
 import os
 import numpy as np
 import pandas as pd
+from abc import ABC, abstractmethod
+
+class Saver():
+	@abstractmethod
+	def record(self):
+		pass
+
+	@abstractmethod
+	def save(self):
+		pass
+
+class AverageSaver(Saver):
+	def __init__(self, dx, field, time_handler, output_folder):
+		self.saver = TensorSaver("eps_tot", dx)
+		self.field = field
+		self.time_handler = time_handler
+		self.output_folder = output_folder
+
+	def record(self):
+		self.saver.record_average(self.field, self.time_handler.time)
+
+	def save(self):
+		self.saver.save(os.path.join(self.output_folder, "numeric_2"))
+
+class VtkSaver(Saver):
+	def __init__(self, field_name, field, time_handler, output_folder):
+		from fenics import File
+		self.field = field
+		self.time_handler = time_handler
+		self.output_folder = output_folder
+		self.vtk = File(os.path.join(output_folder, "vtk", f"{field_name}.pvd"))
+
+	def record(self):
+		self.vtk << (self.field, self.time_handler.time)
+
+	def save(self):
+		pass
 
 class TensorSaver():
 	def __init__(self, name, dx):

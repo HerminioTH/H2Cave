@@ -75,7 +75,7 @@ def plot_exp(ax, axins=None):
 		axins.plot(data[:,0], data[:,1], ".", color="black", label="Exp.", ms=10, mfc="white")
 
 def plot_num(ax1, file_name):
-	output_folder = os.path.join("output", f"{file_name}", "numeric")
+	output_folder = os.path.join("output", f"{file_name}", "numeric_2")
 	eps_tot = pd.read_excel(os.path.join(output_folder, "eps_tot.xlsx"))
 	# eps_ve = pd.read_excel(os.path.join(output_folder, "eps_v.xlsx"))
 	# eps_e = pd.read_excel(os.path.join(output_folder, "eps_e.xlsx"))

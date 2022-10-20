@@ -272,100 +272,144 @@ class CreepPressureSolution():
 
 
 
+class SaltModel():
+	def __init__(self, grid, settings):
+		self.grid = grid
+		self.settings = settings
+		self.initialize()
 
-class BaseViscoelasticModel():
-	@abstractmethod
-	def __init__(self, nu0, nu1, E0, E1, eta, theta, du, v, dx):
-		self.nu0 = nu0
-		self.nu1 = nu1
-		self.E0 = E0
-		self.E1 = E1
-		self.eta = eta
-		self.theta = theta
-		self.du = du
-		self.v = v
-		self.dx = dx
+	def initialize(self):
+		self.define_measures()
+		self.define_function_spaces()
+		self.define_trial_test_functions()
+		self.define_solution_vector()
+		self.define_outward_directions()
+		self.define_viscoelastic_model()
+		self.define_dislocation_creep_model()
+		# self.define_DirichletBC()
 
-	@abstractmethod
-	def compute_matrices(self, dt):
-		pass
+	def define_measures(self):
+		self.dx = Measure("dx", domain=self.grid.mesh, subdomain_data=self.grid.subdomains)
+		self.ds = Measure("ds", domain=self.grid.mesh, subdomain_data=self.grid.boundaries)
 
-	@abstractmethod
-	def stress(self, eps_v_old, eps_tot, eps_tot_old):
-		pass
+	def define_function_spaces(self):
+		self.V = VectorFunctionSpace(self.grid.mesh, "CG", 1)
+		self.TS = TensorFunctionSpace(self.grid.mesh, "DG", 0)
 
-	def constitutive_matrix_sy(self, E, nu):
-		lame = E*nu/((1+nu)*(1-2*nu))
-		G = E/(2 +2*nu)
-		x = 2
-		M = sy.Matrix(6, 6, [ (2*G+lame),	lame,			lame,			0.,		0.,		0.,
-							  lame,			(2*G+lame),		lame,			0.,		0.,		0.,
-							  lame,			lame,			(2*G+lame),		0.,		0.,		0.,
-								0.,			0.,				0.,				x*G,	0.,		0.,
-								0.,			0.,				0.,				0.,		x*G,	0.,
-								0.,			0.,				0.,				0.,		0.,		x*G])
-		return M
+	def define_trial_test_functions(self):
+		self.du = TrialFunction(self.V)
+		self.v = TestFunction(self.V)
 
-	def initialize_matrices(self, C0_sy, C1_sy, C2_sy, C3_sy, C4_sy, C5_sy, CT_sy):
-		self.C0 = as_matrix(Constant(np.array(C0_sy).astype(np.float64)))
-		self.C1 = as_matrix(Constant(np.array(C1_sy).astype(np.float64)))
-		self.C2 = as_matrix(Constant(np.array(C2_sy).astype(np.float64)))
-		self.C3 = as_matrix(Constant(np.array(C3_sy).astype(np.float64)))
-		self.C4 = as_matrix(Constant(np.array(C4_sy).astype(np.float64)))
-		self.C5 = as_matrix(Constant(np.array(C5_sy).astype(np.float64)))
-		self.CT = as_matrix(Constant(np.array(CT_sy).astype(np.float64)))
+	def define_outward_directions(self):
+		norm = FacetNormal(self.grid.mesh)
+		self.v_n = dot(self.v, norm)
 
-	def compute_viscous_strain(self, eps_v, eps_v_old, eps_tot_theta, eps_ie_theta, TS):
-		A = dot(self.C2, strain2voigt(eps_v_old))
-		A += dot(self.C3, strain2voigt(eps_tot_theta - eps_ie_theta))
-		eps_v.assign(local_projection(voigt2stress(A), TS))
+	def define_viscoelastic_model(self):
+		self.model_v = ViscoElasticModel(self.settings["Viscoelastic"], self.settings["Time"]["theta"], self.du, self.v, self.dx, self.TS)
+
+	def define_dislocation_creep_model(self):
+		self.model_c = CreepDislocation(self.settings["DislocationCreep"], self.settings["Time"]["theta"], self.model_v.C0, self.du, self.v, self.dx, self.TS)
+
+	def define_solution_vector(self):
+		self.u = Function(self.V)
+		self.u_k = Function(self.V)
+		self.u.rename("Displacement", "m")
+		self.u_k.rename("Displacement", "m")
+
+	def define_DirichletBC(self):
+		self.bcs = []
+		self.bcs.append(DirichletBC(self.V.sub(2), Constant(0.0), self.grid.boundaries, self.grid.dolfin_tags[self.grid.boundary_dim]["BOTTOM"]))
+		self.bcs.append(DirichletBC(self.V.sub(1), Constant(0.0), self.grid.boundaries, self.grid.dolfin_tags[self.grid.boundary_dim]["SIDE_Y"]))
+		self.bcs.append(DirichletBC(self.V.sub(0), Constant(0.0), self.grid.boundaries, self.grid.dolfin_tags[self.grid.boundary_dim]["SIDE_X"]))
+
+	def update_Dirichlet_BC(self, time_handler):
+		self.bcs = []
+		index_dict = {"u_x": 0, "u_y": 1, "u_z": 2}
+		for key_0, value_0 in self.settings["BoundaryConditions"].items():
+			u_i = index_dict[key_0]
+			for BOUNDARY_NAME, VALUES in value_0.items():
+				if VALUES["type"] == "DIRICHLET":
+					value = Constant(VALUES["value"][time_handler.idx])
+					self.bcs.append(DirichletBC(self.V.sub(u_i), value, self.grid.boundaries, self.grid.dolfin_tags[self.grid.boundary_dim][BOUNDARY_NAME]))
+
+	def update_Neumann_BC(self, time_handler):
+		L_bc = 0
+		index_dict = {"u_x": 0, "u_y": 1, "u_z": 2}
+		for key_0, value_0 in self.settings["BoundaryConditions"].items():
+			u_i = index_dict[key_0]
+			for BOUNDARY_NAME, VALUES in value_0.items():
+				if VALUES["type"] == "NEUMANN":
+					load = Constant(VALUES["value"][time_handler.idx])
+					L_bc += load*self.v_n*self.ds(self.grid.dolfin_tags[self.grid.boundary_dim][BOUNDARY_NAME])
+		self.b_bc = assemble(L_bc)
+
+	def update_BCs(self, time_handler):
+		self.update_Neumann_BC(time_handler)
+		self.update_Dirichlet_BC(time_handler)
+
+	def solve_elastic_model(self, time_handler):
+		# Initialize matrix
+		self.model_v.build_A_elastic()
+		A = self.model_v.A_elastic
+
+		# Apply Neumann boundary conditions
+		self.update_Neumann_BC(time_handler)
+		b = self.b_bc
+
+		# Solve instantaneous elastic problem
+		[bc.apply(A, b) for bc in self.bcs]
+		solve(A, self.u.vector(), b, "cg", "ilu")
 
 
-class VoigtModel(BaseViscoelasticModel):
-	def __init__(self, nu0, nu1, E0, E1, eta, theta, du, v, dx, active=True):
-		super().__init__(nu0, nu1, E0, E1, eta, theta, du, v, dx)
-		self.name = "voigt"
-		self.active = active
+	def solve_mechanics(self):
+		# Initialize rhs
+		b = 0
 
-	def __multiply(self, a, C):
-		x = sy.Symbol("x")
-		return (x*C).subs(x, a)
+		# Build creep rhs
+		self.model_c.build_b()
+		b += self.model_c.b
 
-	def compute_matrices(self, dt):
-		# Define C0 and C1
-		C0_sy = self.constitutive_matrix_sy(self.E0, self.nu0)
-		C1_sy = self.constitutive_matrix_sy(self.E1, self.nu1)
+		# Build viscoelastic rhs
+		self.model_v.build_b(self.model_c.eps_cr, self.model_c.eps_cr_old)
+		b += self.model_v.b
 
-		# Auxiliary 4th order tensors
-		I_sy = sy.Matrix(6, 6, np.identity(6).flatten())
-		C0_bar_sy = self.__multiply(dt/self.eta, C0_sy)
-		C1_bar_sy = self.__multiply(dt/self.eta, C1_sy)
-		I_C0_C1_sy = I_sy + self.__multiply(1-self.theta, C0_bar_sy+C1_bar_sy)
-		I_C0_C1_inv_sy = I_C0_C1_sy.inv()
+		# Boundary condition rhs
+		b += self.b_bc
 
-		C2_sy = I_C0_C1_inv_sy*(I_sy - self.__multiply(self.theta, C0_bar_sy+C1_bar_sy))
-		C3_sy = I_C0_C1_inv_sy*C0_bar_sy
-		C4_sy = C0_sy*C2_sy
-		C5_sy = C0_sy*C3_sy
-		CT_sy = C0_sy - self.__multiply(1-self.theta, C5_sy)
+		# Apply Dirichlet boundary conditions
+		[bc.apply(self.model_v.A, b) for bc in self.bcs]
 
-		self.initialize_matrices(C0_sy, C1_sy, C2_sy, C3_sy, C4_sy, C5_sy, CT_sy)
+		# Solve linear system
+		solve(self.model_v.A, self.u.vector(), b, "cg", "ilu")
 
-	def build_A(self):
-		if self.active:
-			a_form = inner(-sigma((1 - self.theta)*self.C5, epsilon(self.du)), epsilon(self.v))*self.dx
-			self.A = assemble(a_form)
-		else:
-			self.A = 0
+	def assemble_matrix(self):
+		# Assemble matrix
+		self.model_v.build_A()
 
-	def build_b(self, eps_tot_old, eps_ie, eps_ie_old, eps_v_old):
-		if self.active:
-			eps_ie_theta = self.theta*eps_ie_old + (1 - self.theta)*eps_ie
-			# b_form = inner(sigma(self.C0, eps_ie), epsilon(self.v))*self.dx
-			b_form = -inner(sigma(self.C5, eps_ie_theta), epsilon(self.v))*self.dx
-			b_form += inner(sigma(self.theta*self.C5, eps_tot_old), epsilon(self.v))*self.dx
-			b_form += inner(sigma(self.C4, eps_v_old), epsilon(self.v))*self.dx
-			self.b = assemble(b_form)
-		else:
-			self.b = 0
+	def compute_total_strain(self):
+		self.model_v.compute_total_strain(self.u)
+
+	def compute_elastic_strain(self):
+		self.model_v.compute_elastic_strain(self.model_c.eps_cr)
+
+	def compute_stress(self):
+		self.model_v.compute_stress()
+
+	def compute_creep(self, time_handler):
+		self.model_c.compute_creep_strain(self.model_v.stress, time_handler.time_step)
+
+	def compute_viscous_strain(self):
+		self.model_v.compute_viscous_strain(self.model_c.eps_cr, self.model_c.eps_cr_old)
+
+	def update_old_strains(self):
+		self.model_v.update()
+		self.model_c.update()
+
+	def update_matrices(self, time_handler):
+		self.model_v.compute_matrices(time_handler.time_step)
+
+	def compute_error(self):
+		error = np.linalg.norm(self.u.vector() - self.u_k.vector()) / np.linalg.norm(self.u.vector())
+		self.u_k.assign(self.u)
+		return error
 
