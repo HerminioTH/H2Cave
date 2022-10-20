@@ -8,6 +8,7 @@ import json
 sys.path.append(os.path.join("..", "..", "libs"))
 from GridHandler import GridHandler
 from ResultsHandler import TensorSaver
+from TimeHandler import TimeHandler
 from Models import *
 
 sec = 1.
@@ -21,20 +22,161 @@ GPa = 1e9
 def axial_stress(t):
 	return 12*MPa
 
-def compute_error(u, u_k):
-	return np.linalg.norm(u.vector() - u_k.vector()) / np.linalg.norm(u.vector())
+class SaltModel():
+	def __init__(self, grid, settings):
+		self.grid = grid
+		self.settings = settings
+		self.initialize()
+
+	def initialize(self):
+		self.define_measures()
+		self.define_function_spaces()
+		self.define_trial_test_functions()
+		self.define_solution_vector()
+		self.define_outward_directions()
+		self.define_viscoelastic_model()
+		self.define_dislocation_creep_model()
+		# self.define_DirichletBC()
+
+	def define_measures(self):
+		self.dx = Measure("dx", domain=self.grid.mesh, subdomain_data=self.grid.subdomains)
+		self.ds = Measure("ds", domain=self.grid.mesh, subdomain_data=self.grid.boundaries)
+
+	def define_function_spaces(self):
+		self.V = VectorFunctionSpace(self.grid.mesh, "CG", 1)
+		self.TS = TensorFunctionSpace(self.grid.mesh, "DG", 0)
+
+	def define_trial_test_functions(self):
+		self.du = TrialFunction(self.V)
+		self.v = TestFunction(self.V)
+
+	def define_outward_directions(self):
+		norm = FacetNormal(self.grid.mesh)
+		self.v_n = dot(self.v, norm)
+
+	def define_viscoelastic_model(self):
+		self.model_v = ViscoElasticModel(self.settings["Viscoelastic"], self.settings["Time"]["theta"], self.du, self.v, self.dx, self.TS)
+
+	def define_dislocation_creep_model(self):
+		self.model_c = CreepDislocation(self.settings["DislocationCreep"], self.settings["Time"]["theta"], self.model_v.C0, self.du, self.v, self.dx, self.TS)
+
+	def define_solution_vector(self):
+		self.u = Function(self.V)
+		self.u_k = Function(self.V)
+		self.u.rename("Displacement", "m")
+		self.u_k.rename("Displacement", "m")
+
+	def define_DirichletBC(self):
+		self.bcs = []
+		self.bcs.append(DirichletBC(self.V.sub(2), Constant(0.0), self.grid.boundaries, self.grid.dolfin_tags[self.grid.boundary_dim]["BOTTOM"]))
+		self.bcs.append(DirichletBC(self.V.sub(1), Constant(0.0), self.grid.boundaries, self.grid.dolfin_tags[self.grid.boundary_dim]["SIDE_Y"]))
+		self.bcs.append(DirichletBC(self.V.sub(0), Constant(0.0), self.grid.boundaries, self.grid.dolfin_tags[self.grid.boundary_dim]["SIDE_X"]))
+
+	def update_Dirichlet_BC(self, time_handler):
+		self.bcs = []
+		index_dict = {"u_x": 0, "u_y": 1, "u_z": 2}
+		for key_0, value_0 in self.settings["BoundaryConditions"].items():
+			u_i = index_dict[key_0]
+			for BOUNDARY_NAME, VALUES in value_0.items():
+				if VALUES["type"] == "DIRICHLET":
+					value = Constant(VALUES["value"][time_handler.idx])
+					self.bcs.append(DirichletBC(self.V.sub(u_i), value, self.grid.boundaries, self.grid.dolfin_tags[self.grid.boundary_dim][BOUNDARY_NAME]))
+
+	def update_Neumann_BC(self, time_handler):
+		L_bc = 0
+		index_dict = {"u_x": 0, "u_y": 1, "u_z": 2}
+		for key_0, value_0 in self.settings["BoundaryConditions"].items():
+			u_i = index_dict[key_0]
+			for BOUNDARY_NAME, VALUES in value_0.items():
+				if VALUES["type"] == "NEUMANN":
+					load = Constant(VALUES["value"][time_handler.idx])
+					L_bc += load*self.v_n*self.ds(self.grid.dolfin_tags[self.grid.boundary_dim][BOUNDARY_NAME])
+		self.b_bc = assemble(L_bc)
+
+	def update_BCs(self, time_handler):
+		self.update_Neumann_BC(time_handler)
+		self.update_Dirichlet_BC(time_handler)
+
+	def solve_elastic_model(self, time_handler):
+		# Initialize matrix
+		self.model_v.build_A_elastic()
+		A = self.model_v.A_elastic
+
+		# Apply Neumann boundary conditions
+		self.update_Neumann_BC(time_handler)
+		b = self.b_bc
+
+		# Solve instantaneous elastic problem
+		[bc.apply(A, b) for bc in self.bcs]
+		solve(A, self.u.vector(), b, "cg", "ilu")
+
+
+	def solve_mechanics(self):
+		# Initialize rhs
+		b = 0
+
+		# Build creep rhs
+		self.model_c.build_b()
+		b += self.model_c.b
+
+		# Build viscoelastic rhs
+		self.model_v.build_b(self.model_c.eps_cr, self.model_c.eps_cr_old)
+		b += self.model_v.b
+
+		# Boundary condition rhs
+		b += self.b_bc
+
+		# Apply Dirichlet boundary conditions
+		[bc.apply(self.model_v.A, b) for bc in self.bcs]
+
+		# Solve linear system
+		solve(self.model_v.A, self.u.vector(), b, "cg", "ilu")
+
+	def assemble_matrix(self):
+		# Assemble matrix
+		self.model_v.build_A()
+
+	def compute_total_strain(self):
+		self.model_v.compute_total_strain(self.u)
+
+	def compute_elastic_strain(self):
+		self.model_v.compute_elastic_strain(self.model_c.eps_cr)
+
+	def compute_stress(self):
+		self.model_v.compute_stress()
+
+	def compute_creep(self, time_handler):
+		self.model_c.compute_creep_strain(self.model_v.stress, time_handler.time_step)
+
+	def compute_viscous_strain(self):
+		self.model_v.compute_viscous_strain(self.model_c.eps_cr, self.model_c.eps_cr_old)
+
+	def update_old_strains(self):
+		self.model_v.update()
+		self.model_c.update()
+
+	def update_matrices(self, time_handler):
+		self.model_v.compute_matrices(time_handler.time_step)
+
+	def compute_error(self):
+		error = np.linalg.norm(self.u.vector() - self.u_k.vector()) / np.linalg.norm(self.u.vector())
+		self.u_k.assign(self.u)
+		return error
+
+
 
 def main():
-
 	# Define settings
+	time_list = np.linspace(0, 20*hour, 4)
 	settings = {
 		"Paths" : {
-			"Output": "output/case_0",
+			"Output": "output/case_1",
 			"Grid": "../../grids/quarter_cylinder_0",
 		},
 		"Time" : {
+			"timeList": time_list,
 			"timeStep": 10*hour,
-			"finalTime": 20*hour,
+			"finalTime": 800*hour,
 			"theta": 0.5,
 		},
 		"Viscoelastic" : {
@@ -50,122 +192,92 @@ def main():
 			"A": 5.2e-36,
 			"n": 5.0,
 			"T": 298
+		},
+		"BoundaryConditions" : {
+			"u_x" : {
+				"SIDE_X": 	{"type": "DIRICHLET", 	"value": np.repeat(0.0, len(time_list))},
+				"SIDE_Y": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
+				"OUTSIDE": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
+				"BOTTOM":	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
+				"TOP": 		{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))}
+			},
+			"u_y" : {
+				"SIDE_X": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
+				"SIDE_Y": 	{"type": "DIRICHLET", 	"value": np.repeat(0.0, len(time_list))},
+				"OUTSIDE": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
+				"BOTTOM":	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
+				"TOP": 		{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))}
+			},
+			"u_z" : {
+				"SIDE_X": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
+				"SIDE_Y": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
+				"OUTSIDE": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
+				"BOTTOM":	{"type": "DIRICHLET", 	"value": np.repeat(0.0, len(time_list))},
+				"TOP": 		{"type": "NEUMANN", 	"value": np.repeat(-12*MPa, len(time_list))}
+			}
 		}
 	}
 
-	# Transient settings
-	t = 0
-	dt = settings["Time"]["timeStep"]
-	t_final = settings["Time"]["finalTime"]
-	theta = settings["Time"]["theta"]
+	# Define time handler
+	time_handler = TimeHandler(settings["Time"])
+
+	# Define folders
+	output_folder = os.path.join(*settings["Paths"]["Output"].split("/"))
+	grid_folder = os.path.join(*settings["Paths"]["Grid"].split("/"))
 
 	# Load grid
-	grid_folder = os.path.join(*settings["Paths"]["Grid"].split("/"))
 	geometry_name = "geom"
 	grid = GridHandler(geometry_name, grid_folder)
 
-	# Define output folder
-	output_folder = os.path.join(*settings["Paths"]["Output"].split("/"))
+	# Build salt model
+	salt = SaltModel(grid, settings)
 
-	# Define function space
-	V = VectorFunctionSpace(grid.mesh, "CG", 1)
+	# Update boundary conditions
+	salt.update_BCs(time_handler)
 
-	# Define Dirichlet boundary conditions
-	bcs = []
-	bcs.append(DirichletBC(V.sub(2), Constant(0.0), grid.boundaries, grid.dolfin_tags[grid.boundary_dim]["BOTTOM"]))
-	bcs.append(DirichletBC(V.sub(1), Constant(0.0), grid.boundaries, grid.dolfin_tags[grid.boundary_dim]["SIDE_Y"]))
-	bcs.append(DirichletBC(V.sub(0), Constant(0.0), grid.boundaries, grid.dolfin_tags[grid.boundary_dim]["SIDE_X"]))
-	# bcs.append(DirichletBC(V.sub(0), Constant(0.0), grid.boundaries, grid.dolfin_tags[grid.boundary_dim]["OUTSIDE"]))
-	# bcs.append(DirichletBC(V.sub(1), Constant(0.0), grid.boundaries, grid.dolfin_tags[grid.boundary_dim]["OUTSIDE"]))
+	# Saver
+	saver_eps_tot = TensorSaver("eps_tot", salt.dx)
 
-	# Define measures
-	dx = Measure("dx", domain=grid.mesh, subdomain_data=grid.subdomains)
-	ds = Measure("ds", domain=grid.mesh, subdomain_data=grid.boundaries)
-
-	# Define variational problem
-	du = TrialFunction(V)
-	d = du.geometric_dimension()  # space dimension
-	v = TestFunction(V)
-
-	# Define normal directions on mesh
-	norm = FacetNormal(grid.mesh)
-	v_n = dot(v, norm)
-
-	# Define solution vector
-	u = Function(V)
-	u.rename("Displacement", "m")
-	u_k = Function(V)
-	u_k.rename("Displacement", "m")
-
-	# # Define initial tensors
-	TS = TensorFunctionSpace(grid.mesh, "DG", 0)
-
-	# Create tensor savers
-	saver_eps_e = TensorSaver("eps_e", dx)
-	saver_eps_tot = TensorSaver("eps_tot", dx)
-	saver_eps_v = TensorSaver("eps_v", dx)
-	saver_eps_cr = TensorSaver("eps_cr", dx)
-	saver_eps_cr_rate = TensorSaver("eps_cr_rate", dx)
-	saver_stress = TensorSaver("stress", dx)
-
-	# Define viscoelastic model
-	model_v = ViscoElasticModel(settings["Viscoelastic"], theta, du, v, dx, TS)
-	model_v.compute_matrices(dt)
-
-	# Define creep model (Power-Law)
-	model_c = CreepDislocation(settings["DislocationCreep"], theta, model_v.C0, du, v, dx, TS)
-
-	# Initialize matrix
-	model_v.build_A_elastic()
-	A = model_v.A_elastic
-
-	# Apply Neumann boundary conditions
-	L_bc = -axial_stress(t)*v_n*ds(grid.dolfin_tags[grid.boundary_dim]["TOP"])
-	b_bc = assemble(L_bc)
-	b = b_bc
-
-	# Solve instantaneous elastic problem
-	[bc.apply(A, b) for bc in bcs]
-	solve(A, u.vector(), b, "cg", "ilu")
+	# Solve instantaneoyus elastic response
+	salt.solve_elastic_model(time_handler)
 
 	# Compute total strain
-	model_v.compute_total_strain(u)
+	salt.compute_total_strain()
 
-
-	# Compute elastic strain
-	eps_ie = model_c.eps_cr
-	model_v.compute_elastic_strain(eps_ie)
+	# Compute elastic strin
+	salt.compute_elastic_strain()
 
 	# Compute stress
-	model_v.compute_stress()
-
-	# Record tensors
-	saver_eps_e.record_average(model_v.eps_e, t)
-	saver_eps_v.record_average(model_v.eps_v, t)
-	saver_eps_cr.record_average(model_c.eps_cr, t)
-	saver_eps_cr_rate.record_average(model_c.eps_cr_rate, t)
-	saver_eps_tot.record_average(model_v.eps_tot, t)
-	saver_stress.record_average(model_v.stress, t)
+	salt.compute_stress()
 
 	# Compute viscous strain
-	eps_ie_old = model_c.eps_cr_old
-	model_v.compute_viscous_strain(eps_ie, eps_ie_old)
+	salt.update_matrices(time_handler)
+	salt.compute_viscous_strain()
+	salt.model_v.update()
+	salt.assemble_matrix()
 
-	# Update total strain
-	model_v.update()
+	# Save results
+	saver_eps_tot.record_average(salt.model_v.eps_tot, time_handler.time)
 
-	# Include viscous terms for transient simulation
-	model_v.build_A()
-	# A += model_v.A
+	# Time marching
+	while not time_handler.is_final_time_reached():
 
-	while t < t_final:
 		# Update time
-		t += dt
-		print(t/hour)
+		time_handler.advance_time()
+		print()
+		print(time_handler.time/hour)
 
-		# Apply Neumann boundary conditions
-		L_bc = -axial_stress(t)*v_n*ds(grid.dolfin_tags[grid.boundary_dim]["TOP"])
-		b_bc = assemble(L_bc)
+		# Update constitutive matrices
+		salt.update_matrices(time_handler)
+
+		# Assemble stiffness matrix
+		salt.assemble_matrix()
+
+		# Compute creep
+		salt.compute_creep(time_handler)
+
+		# Update Neumann BC
+		salt.update_BCs(time_handler)
 
 		# Iteration settings
 		ite = 0
@@ -173,92 +285,46 @@ def main():
 		error = 2*tol
 		error_old = error
 
-		# Compute creep strain
-		model_c.compute_creep_strain(model_v.stress, dt)
-
 		while error > tol:
-			b = 0
-
-			# # Build creep rhs
-			model_c.build_b()
-			b += model_c.b
-
-			# Build viscoelastic rhs
-			model_v.build_b(model_c.eps_cr, model_c.eps_cr_old)
-			b += model_v.b
-
-			# Boundary condition rhs
-			b += b_bc
-
-			# Apply Dirichlet boundary conditions
-			[bc.apply(A, b) for bc in bcs]
-
-			# Solve linear system
-			# solve(A, u.vector(), b)
-			solve(A, u.vector(), b, "cg", "ilu")
+			# Solve mechanical problem
+			salt.solve_mechanics()
 
 			# Compute error
-			error = compute_error(u, u_k)
+			error = salt.compute_error()
 			print(ite, error)
 
-			# Update error
-			error_old = error
-
-			# Update solution
-			u_k.assign(u)
-
 			# Compute total strain
-			model_v.compute_total_strain(u)
+			salt.compute_total_strain()
 
-			# Compute elastic strain
-			model_v.compute_elastic_strain(model_c.eps_cr)
+			# Compute elastic strin
+			salt.compute_elastic_strain()
 
 			# Compute stress
-			model_v.compute_stress()
+			salt.compute_stress()
 
-			# Compute creep strain
-			model_c.compute_creep_strain(model_v.stress, dt)
+			# Compute creep
+			salt.compute_creep(time_handler)
 
 			# Increase iteration
 			ite += 1
 
 		# Compute viscous strain
-		model_v.compute_viscous_strain(model_c.eps_cr, model_c.eps_cr_old)
+		salt.compute_viscous_strain()
 
-		# Update old variables
-		model_v.update()
-		model_c.update()
+		# Update old strins
+		salt.update_old_strains()
 
-		# Record tensors
-		saver_eps_e.record_average(model_v.eps_e, t)
-		saver_eps_v.record_average(model_v.eps_v, t)
-		saver_eps_cr.record_average(model_c.eps_cr, t)
-		saver_eps_cr_rate.record_average(model_c.eps_cr_rate, t)
-		saver_eps_tot.record_average(model_v.eps_tot, t)
-		saver_stress.record_average(model_v.stress, t)
+		# Save results
+		saver_eps_tot.record_average(salt.model_v.eps_tot, time_handler.time)
 
-	# 	# Save results
-	# 	# vtk_displacement << (u, t)
-	# 	# vtk_stress << (stress, t)
-	# 	# vtk_strain_e << (eps_e, t)
-	# 	# vtk_strain_v << (eps_v, t)
-	# 	# vtk_strain_tot << (eps_tot, t)
-	# 	# vtk_strain_cr << (eps_cr, t)
-	# 	# vtk_strain_cr_rate << (eps_cr_rate, t)
-
-	# Save tensor results
-	saver_eps_e.save(os.path.join(output_folder, "numeric"))
-	saver_eps_v.save(os.path.join(output_folder, "numeric"))
-	saver_eps_cr.save(os.path.join(output_folder, "numeric"))
-	saver_eps_cr_rate.save(os.path.join(output_folder, "numeric"))
+	# Write results
 	saver_eps_tot.save(os.path.join(output_folder, "numeric"))
-	saver_stress.save(os.path.join(output_folder, "numeric"))
 
-	# Copy .msh mesh to output_folder
-	source = os.path.join(grid_folder, geometry_name+".msh")
-	destination = output_folder
-	shutil.copy(source, destination)
-	shutil.copy(__file__, os.path.join(destination, "copy.py"))
+
+
+
+
+
 
 if __name__ == "__main__":
 	main()

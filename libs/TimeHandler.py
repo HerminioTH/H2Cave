@@ -6,7 +6,7 @@ class TimeHandler():
 		self.build_times()
 
 	def build_times(self):
-		if self.time_settings["timeList"] == None:
+		if type(self.time_settings["timeList"]) == type(None):
 			self.final_time = self.time_settings["finalTime"]
 			self.time_step = self.time_settings["timeStep"]
 			self.time_list = np.arange(0, self.final_time + self.time_step, self.time_step)
