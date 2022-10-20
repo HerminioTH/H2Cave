@@ -14,8 +14,8 @@ class Saver():
 		pass
 
 class AverageSaver(Saver):
-	def __init__(self, dx, field, time_handler, output_folder):
-		self.saver = TensorSaver("eps_tot", dx)
+	def __init__(self, dx, field_name, field, time_handler, output_folder):
+		self.saver = TensorSaver(field_name, dx)
 		self.field = field
 		self.time_handler = time_handler
 		self.output_folder = output_folder
@@ -24,7 +24,7 @@ class AverageSaver(Saver):
 		self.saver.record_average(self.field, self.time_handler.time)
 
 	def save(self):
-		self.saver.save(os.path.join(self.output_folder, "numeric_2"))
+		self.saver.save(os.path.join(self.output_folder, "avg"))
 
 class VtkSaver(Saver):
 	def __init__(self, field_name, field, time_handler, output_folder):

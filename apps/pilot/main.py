@@ -9,28 +9,13 @@ sys.path.append(os.path.join("..", "..", "libs"))
 from GridHandler import GridHandler
 from ResultsHandler import AverageSaver, VtkSaver
 from TimeHandler import TimeHandler
+from SimulationHandler import *
 from Models import *
-
-
-sec = 1.
-minute = 60*sec
-hour = 60*minute
-day = 24*hour
-kPa = 1e3
-MPa = 1e6
-GPa = 1e9
-
-
-# class Simulator():
-# 	def __init__(self)
-
-
-
 
 
 def main():
 	# Define settings
-	time_list = np.linspace(0, 80*hour, 10)
+	time_list = np.linspace(0, 800*hour, 50)
 	settings = {
 		"Paths" : {
 			"Output": "output/case_1",
@@ -96,98 +81,29 @@ def main():
 	salt = SaltModel(grid, settings)
 
 	# Saver
-	avg_saver = AverageSaver(salt.dx, salt.model_v.eps_tot, time_handler, output_folder)
-	vtk_saver = VtkSaver("displacement", salt.u, time_handler, output_folder)
+	avg_eps_tot_saver = AverageSaver(salt.dx, "eps_tot", salt.model_v.eps_tot, time_handler, output_folder)
+	avg_eps_v_saver = AverageSaver(salt.dx, "eps_v", salt.model_v.eps_v, time_handler, output_folder)
+	avg_eps_e_saver = AverageSaver(salt.dx, "eps_e", salt.model_v.eps_e, time_handler, output_folder)
+	avg_eps_cr_saver = AverageSaver(salt.dx, "eps_cr", salt.model_c.eps_cr, time_handler, output_folder)
 
+	vtk_u_saver = VtkSaver("displacement", salt.u, time_handler, output_folder)
+	vtk_stress_saver = VtkSaver("stress", salt.model_v.stress, time_handler, output_folder)
+	vtk_eps_tot_saver = VtkSaver("eps_tot", salt.model_v.eps_tot, time_handler, output_folder)
 
+	# Define simulator
+	sim = Simulator(salt, time_handler)
 
-	# Update boundary conditions
-	salt.update_BCs(time_handler)
+	# Add savers
+	sim.add_saver(avg_eps_tot_saver)
+	sim.add_saver(avg_eps_v_saver)
+	sim.add_saver(avg_eps_e_saver)
+	sim.add_saver(avg_eps_cr_saver)
+	sim.add_saver(vtk_u_saver)
+	sim.add_saver(vtk_eps_tot_saver)
 
-	# Solve instantaneoyus elastic response
-	salt.solve_elastic_model(time_handler)
+	# Run simulation
+	sim.run()
 
-	# Compute total strain
-	salt.compute_total_strain()
-
-	# Compute elastic strin
-	salt.compute_elastic_strain()
-
-	# Compute stress
-	salt.compute_stress()
-
-	# Compute viscous strain
-	salt.update_matrices(time_handler)
-	salt.compute_viscous_strain()
-	salt.model_v.update()
-	salt.assemble_matrix()
-
-	# Save results
-	avg_saver.record()
-	vtk_saver.record()
-
-	# Time marching
-	while not time_handler.is_final_time_reached():
-
-		# Update time
-		time_handler.advance_time()
-		print()
-		print(time_handler.time/hour)
-
-		# Update constitutive matrices
-		salt.update_matrices(time_handler)
-
-		# Assemble stiffness matrix
-		salt.assemble_matrix()
-
-		# Compute creep
-		salt.compute_creep(time_handler)
-
-		# Update Neumann BC
-		salt.update_BCs(time_handler)
-
-		# Iteration settings
-		ite = 0
-		tol = 1e-9
-		error = 2*tol
-		error_old = error
-
-		while error > tol:
-			# Solve mechanical problem
-			salt.solve_mechanics()
-
-			# Compute error
-			error = salt.compute_error()
-			print(ite, error)
-
-			# Compute total strain
-			salt.compute_total_strain()
-
-			# Compute elastic strin
-			salt.compute_elastic_strain()
-
-			# Compute stress
-			salt.compute_stress()
-
-			# Compute creep
-			salt.compute_creep(time_handler)
-
-			# Increase iteration
-			ite += 1
-
-		# Compute viscous strain
-		salt.compute_viscous_strain()
-
-		# Update old strins
-		salt.update_old_strains()
-
-		# Save results
-		avg_saver.record()
-		vtk_saver.record()
-
-	# Write results
-	avg_saver.save()
-	vtk_saver.save()
 
 
 

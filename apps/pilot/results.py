@@ -75,18 +75,18 @@ def plot_exp(ax, axins=None):
 		axins.plot(data[:,0], data[:,1], ".", color="black", label="Exp.", ms=10, mfc="white")
 
 def plot_num(ax1, file_name):
-	output_folder = os.path.join("output", f"{file_name}", "numeric_2")
+	output_folder = os.path.join("output", f"{file_name}", "avg")
 	eps_tot = pd.read_excel(os.path.join(output_folder, "eps_tot.xlsx"))
-	# eps_ve = pd.read_excel(os.path.join(output_folder, "eps_v.xlsx"))
-	# eps_e = pd.read_excel(os.path.join(output_folder, "eps_e.xlsx"))
-	# eps_cr = pd.read_excel(os.path.join(output_folder, "eps_cr.xlsx"))
+	eps_ve = pd.read_excel(os.path.join(output_folder, "eps_v.xlsx"))
+	eps_e = pd.read_excel(os.path.join(output_folder, "eps_e.xlsx"))
+	eps_cr = pd.read_excel(os.path.join(output_folder, "eps_cr.xlsx"))
 	# eps_ve["22"] += eps_e["22"]
 
 	step = 1
-	ax1.plot(eps_tot["Time"][::step]/hour, 100*abs(eps_tot["22"][::step]), ".", color="0.15", label=r"$\varepsilon_{tot}$", ms=8, mfc="steelblue")
-	# ax1.plot(eps_ve["Time"][::step]/hour, 100*abs(eps_ve["22"][::step]), ".", color="0.15", label=r"$\varepsilon_{v}$", ms=8, mfc="lightcoral")
-	# ax1.plot(eps_e["Time"][::step]/hour, 100*abs(eps_e["22"][::step]), ".", color="0.15", label=r"$\varepsilon_{e}$", ms=8, mfc="gold")
-	# ax1.plot(eps_cr["Time"][::step]/hour, 100*abs(eps_cr["22"][::step]), ".-", color="0.15", label=r"$\varepsilon_{cr}$", ms=8, mfc="#ac84cbff")
+	ax1.plot(eps_tot["Time"][::step]/hour, 100*abs(eps_tot["22"][::step]), ".-", color="0.15", label=r"$\varepsilon_{tot}$", ms=8, mfc="steelblue")
+	ax1.plot(eps_ve["Time"][::step]/hour, 100*abs(eps_ve["22"][::step]), ".-", color="0.15", label=r"$\varepsilon_{v}$", ms=8, mfc="lightcoral")
+	ax1.plot(eps_e["Time"][::step]/hour, 100*abs(eps_e["22"][::step]), ".-", color="0.15", label=r"$\varepsilon_{e}$", ms=8, mfc="gold")
+	ax1.plot(eps_cr["Time"][::step]/hour, 100*abs(eps_cr["22"][::step]), ".-", color="0.15", label=r"$\varepsilon_{cr}$", ms=8, mfc="#ac84cbff")
 	ax1.set_xlabel("Time [hour]", size=12, fontname="serif")
 	ax1.set_ylabel("Axial Strain [%]", size=12, fontname="serif")
 	ax1.grid(True)
@@ -106,7 +106,7 @@ def main():
 
 	apply_white_theme(fig, [ax1], transparent=False)
 
-	fig.savefig(os.path.join("output", folder, f"fig.png"), dpi=200)
+	# fig.savefig(os.path.join("output", folder, f"fig.png"), dpi=200)
 
 	plt.show()
 
