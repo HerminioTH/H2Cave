@@ -334,9 +334,7 @@ class SaltModel():
 
 	def update_Neumann_BC(self, time_handler):
 		L_bc = 0
-		index_dict = {"u_x": 0, "u_y": 1, "u_z": 2}
 		for key_0, value_0 in self.settings["BoundaryConditions"].items():
-			u_i = index_dict[key_0]
 			for BOUNDARY_NAME, VALUES in value_0.items():
 				if VALUES["type"] == "NEUMANN":
 					load = Constant(VALUES["value"][time_handler.idx])
