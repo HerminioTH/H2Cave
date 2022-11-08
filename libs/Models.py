@@ -286,7 +286,6 @@ class SaltModel():
 		self.define_outward_directions()
 		self.define_viscoelastic_model()
 		self.define_dislocation_creep_model()
-		# self.define_DirichletBC()
 
 	def define_measures(self):
 		self.dx = Measure("dx", domain=self.grid.mesh, subdomain_data=self.grid.subdomains)
@@ -315,12 +314,6 @@ class SaltModel():
 		self.u_k = Function(self.V)
 		self.u.rename("Displacement", "m")
 		self.u_k.rename("Displacement", "m")
-
-	def define_DirichletBC(self):
-		self.bcs = []
-		self.bcs.append(DirichletBC(self.V.sub(2), Constant(0.0), self.grid.boundaries, self.grid.dolfin_tags[self.grid.boundary_dim]["BOTTOM"]))
-		self.bcs.append(DirichletBC(self.V.sub(1), Constant(0.0), self.grid.boundaries, self.grid.dolfin_tags[self.grid.boundary_dim]["SIDE_Y"]))
-		self.bcs.append(DirichletBC(self.V.sub(0), Constant(0.0), self.grid.boundaries, self.grid.dolfin_tags[self.grid.boundary_dim]["SIDE_X"]))
 
 	def update_Dirichlet_BC(self, time_handler):
 		self.bcs = []
