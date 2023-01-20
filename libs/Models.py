@@ -286,6 +286,8 @@ class SaltModel():
 		self.define_outward_directions()
 		self.define_viscoelastic_model()
 		self.define_dislocation_creep_model()
+		# self.define_pressure_solution_creep_model()
+		# self.define_viscoplastic_model()
 
 	def define_measures(self):
 		self.dx = Measure("dx", domain=self.grid.mesh, subdomain_data=self.grid.subdomains)
