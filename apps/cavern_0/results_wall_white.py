@@ -133,8 +133,8 @@ def main():
 	index_D = np.where(z == -460)[0][0]
 
 	beta = 30
-	# for time_index in [280]:
-	for time_index in range(0, len(t_day), 3):
+	for time_index in [-1]:
+	# for time_index in range(0, len(t_day), 3):
 		fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 		fig.subplots_adjust(top=0.94, bottom=0.125, left=0.080, right=0.98, hspace=0.21, wspace=0.26)
 		dx = beta*u[time_index,:]
@@ -182,11 +182,11 @@ def main():
 		# apply_dark_theme(fig, [ax1, ax2], transparent=False)
 		apply_special_theme(fig, [ax1, ax2], transparent=True)
 
-		save_figure(fig, os.path.join(output_folder, "figures", "white"), time_index, dpi=200)
+		# save_figure(fig, os.path.join(output_folder, "figures", "white"), time_index, dpi=200)
 
-		plt.close()
+		# plt.close()
 
-	# plt.show()
+	plt.show()
 
 if __name__ == '__main__':
 	main()

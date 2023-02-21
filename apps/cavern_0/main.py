@@ -16,7 +16,7 @@ def pressure(t):
 	p_int = 13*MPa
 	period = 2*np.pi/(2*day)
 	dP = 4*MPa
-	return -(p_int + dP*np.sin(period*t))
+	return (p_int + dP*np.sin(period*t))
 
 
 def main():
@@ -26,7 +26,7 @@ def main():
 
 	settings = {
 		"Paths" : {
-			"Output": "output/case_3",
+			"Output": "output/case_2",
 			"Grid": "../../grids/cavern_0",
 		},
 		"Time" : {
