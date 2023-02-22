@@ -18,7 +18,7 @@ def main():
 	time_list = np.linspace(0, 800*hour, 50)
 	settings = {
 		"Paths" : {
-			"Output": "output/case_1",
+			"Output": "output/case_2",
 			"Grid": "../../grids/quarter_cylinder_0",
 		},
 		"Time" : {
@@ -66,9 +66,6 @@ def main():
 		}
 	}
 
-	# Define time handler
-	time_handler = TimeHandler(settings["Time"])
-
 	# Define folders
 	output_folder = os.path.join(*settings["Paths"]["Output"].split("/"))
 	grid_folder = os.path.join(*settings["Paths"]["Grid"].split("/"))
@@ -77,14 +74,23 @@ def main():
 	geometry_name = "geom"
 	grid = GridHandler(geometry_name, grid_folder)
 
+	# Define time handler
+	time_handler = TimeHandler(settings["Time"])
+
+	# Define finite element handler (function spaces, normal vectors, etc)
+	fem_handler = FemHandler(grid)
+
+	# Define boundary condition handler
+	bc_handler = BoundaryConditionHandler(fem_handler, settings)
+
 	# Build salt model
-	salt = SaltModel(grid, settings)
+	salt = SaltModel_2(fem_handler, bc_handler, settings)
 
 	# Saver
-	avg_eps_tot_saver = AverageSaver(salt.dx, "eps_tot", salt.model_v.eps_tot, time_handler, output_folder)
-	avg_eps_v_saver = AverageSaver(salt.dx, "eps_v", salt.model_v.eps_v, time_handler, output_folder)
-	avg_eps_e_saver = AverageSaver(salt.dx, "eps_e", salt.model_v.eps_e, time_handler, output_folder)
-	avg_eps_cr_saver = AverageSaver(salt.dx, "eps_cr", salt.model_c.eps_cr, time_handler, output_folder)
+	avg_eps_tot_saver = AverageSaver(fem_handler.dx, "eps_tot", salt.model_v.eps_tot, time_handler, output_folder)
+	avg_eps_v_saver = AverageSaver(fem_handler.dx, "eps_v", salt.model_v.eps_v, time_handler, output_folder)
+	avg_eps_e_saver = AverageSaver(fem_handler.dx, "eps_e", salt.model_v.eps_e, time_handler, output_folder)
+	avg_eps_cr_saver = AverageSaver(fem_handler.dx, "eps_cr", salt.model_c.eps_cr, time_handler, output_folder)
 
 	vtk_u_saver = VtkSaver("displacement", salt.u, time_handler, output_folder)
 	vtk_stress_saver = VtkSaver("stress", salt.model_v.stress, time_handler, output_folder)

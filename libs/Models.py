@@ -112,7 +112,7 @@ class ViscoElasticModel(BaseModel):
 			eps -= eps_ie
 		self.eps_e.assign(local_projection(eps, self.TS))
 
-	def compute_viscous_strain(self, eps_ie=None, eps_ie_old=None):
+	def compute_viscoelastic_strain(self, eps_ie=None, eps_ie_old=None):
 		eps_tot_theta = self.theta*self.eps_tot_old + (1 - self.theta)*self.eps_tot
 		form_v = dot(self.C2, strain2voigt(self.eps_v_old))
 		form_v += dot(self.C3, strain2voigt(eps_tot_theta))
@@ -270,6 +270,157 @@ class CreepPressureSolution():
 
 
 
+class FemHandler():
+	def __init__(self, grid):
+		self.grid = grid
+		self.dx = Measure("dx", domain=self.grid.mesh, subdomain_data=self.grid.subdomains)
+		self.ds = Measure("ds", domain=self.grid.mesh, subdomain_data=self.grid.boundaries)
+		self.V = VectorFunctionSpace(self.grid.mesh, "CG", 1)
+		self.TS = TensorFunctionSpace(self.grid.mesh, "DG", 0)
+		self.du = TrialFunction(self.V)
+		self.v = TestFunction(self.V)
+		self.v_n = dot(self.v, FacetNormal(self.grid.mesh))
+
+class BoundaryConditionHandler():
+	def __init__(self, fem_handler, settings):
+		self.fem_handler = fem_handler
+		self.boundaryConditions = settings["BoundaryConditions"]
+
+	def update_Dirichlet_BC(self, time_handler):
+		self.bcs = []
+		index_dict = {"u_x": 0, "u_y": 1, "u_z": 2}
+		for key_0, value_0 in self.boundaryConditions.items():
+			u_i = index_dict[key_0]
+			for BOUNDARY_NAME, VALUES in value_0.items():
+				if VALUES["type"] == "DIRICHLET":
+					value = Constant(VALUES["value"][time_handler.idx])
+					self.bcs.append(
+									DirichletBC(
+												self.fem_handler.V.sub(u_i),
+												value,
+												self.fem_handler.grid.boundaries,
+												self.fem_handler.grid.dolfin_tags[self.fem_handler.grid.boundary_dim][BOUNDARY_NAME]
+									)
+					)
+
+	def update_Neumann_BC(self, time_handler):
+		L_bc = 0
+		for key_0, value_0 in self.boundaryConditions.items():
+			for BOUNDARY_NAME, VALUES in value_0.items():
+				if VALUES["type"] == "NEUMANN":
+					load = Constant(VALUES["value"][time_handler.idx])
+					L_bc += load*self.fem_handler.v_n*self.fem_handler.ds(self.fem_handler.grid.dolfin_tags[self.fem_handler.grid.boundary_dim][BOUNDARY_NAME])
+		self.b_bc = assemble(L_bc)
+
+	def update_BCs(self, time_handler):
+		self.update_Neumann_BC(time_handler)
+		self.update_Dirichlet_BC(time_handler)
+
+
+
+
+
+
+
+class SaltModel_2():
+	def __init__(self, fem_handler, bc_handler, settings):
+		self.fem_handler = fem_handler
+		self.bc_handler = bc_handler
+		self.settings = settings
+		self.initialize_solution_vector()
+		self.initialize_models()
+
+	def initialize_solution_vector(self):
+		self.u = Function(self.fem_handler.V)
+		self.u_k = Function(self.fem_handler.V)
+		self.u.rename("Displacement", "m")
+		self.u_k.rename("Displacement", "m")
+
+	def initialize_models(self):
+		self.model_v = ViscoElasticModel(
+											self.settings["Viscoelastic"],
+											self.settings["Time"]["theta"],
+											self.fem_handler.du,
+											self.fem_handler.v,
+											self.fem_handler.dx,
+											self.fem_handler.TS
+		)
+
+		self.model_c = CreepDislocation(
+											self.settings["DislocationCreep"],
+											self.settings["Time"]["theta"],
+											self.model_v.C0,
+											self.fem_handler.du,
+											self.fem_handler.v,
+											self.fem_handler.dx,
+											self.fem_handler.TS
+		)
+
+	def solve_elastic_model(self, time_handler):
+		# Initialize matrix
+		self.model_v.build_A_elastic()
+		A = self.model_v.A_elastic
+
+		# Apply Neumann boundary conditions
+		self.bc_handler.update_Neumann_BC(time_handler)
+		b = self.bc_handler.b_bc
+
+		# Solve instantaneous elastic problem
+		[bc.apply(A, b) for bc in self.bc_handler.bcs]
+		solve(A, self.u.vector(), b, "cg", "ilu")
+
+
+	def solve_mechanics(self):
+		# Initialize rhs
+		b = 0
+
+		# Build creep rhs
+		self.model_c.build_b()
+		b += self.model_c.b
+
+		# Build viscoelastic rhs
+		self.model_v.build_b(self.model_c.eps_cr, self.model_c.eps_cr_old)
+		b += self.model_v.b
+
+		# Boundary condition rhs
+		b += self.bc_handler.b_bc
+
+		# Apply Dirichlet boundary conditions
+		[bc.apply(self.model_v.A, b) for bc in self.bc_handler.bcs]
+
+		# Solve linear system
+		solve(self.model_v.A, self.u.vector(), b, "cg", "ilu")
+
+	def assemble_matrix(self):
+		self.model_v.build_A()
+
+	def compute_total_strain(self):
+		self.model_v.compute_total_strain(self.u)
+
+	def compute_elastic_strain(self):
+		self.model_v.compute_elastic_strain(self.model_c.eps_cr)
+
+	def compute_stress(self):
+		self.model_v.compute_stress()
+
+	def compute_inelastic_strains(self, time_handler):
+		self.model_c.compute_creep_strain(self.model_v.stress, time_handler.time_step)
+
+	def compute_viscoelastic_strain(self):
+		self.model_v.compute_viscoelastic_strain(self.model_c.eps_cr, self.model_c.eps_cr_old)
+
+	def update_old_strains(self):
+		self.model_v.update()
+		self.model_c.update()
+
+	def update_matrices(self, time_handler):
+		self.model_v.compute_matrices(time_handler.time_step)
+
+	def compute_error(self):
+		error = np.linalg.norm(self.u.vector() - self.u_k.vector()) / np.linalg.norm(self.u.vector())
+		self.u_k.assign(self.u)
+		return error
+
 
 
 class SaltModel():
@@ -391,8 +542,8 @@ class SaltModel():
 	def compute_creep(self, time_handler):
 		self.model_c.compute_creep_strain(self.model_v.stress, time_handler.time_step)
 
-	def compute_viscous_strain(self):
-		self.model_v.compute_viscous_strain(self.model_c.eps_cr, self.model_c.eps_cr_old)
+	def compute_viscoelastic_strain(self):
+		self.model_v.compute_viscoelastic_strain(self.model_c.eps_cr, self.model_c.eps_cr_old)
 
 	def update_old_strains(self):
 		self.model_v.update()
