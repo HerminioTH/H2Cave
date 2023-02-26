@@ -1,0 +1,67 @@
+import abc
+import numpy as np
+
+class Controller(metaclass=abc.ABCMeta):
+	@abc.abstractmethod
+	def __init__(self, name):
+		self.name = name
+		self.variable = None
+
+	@abc.abstractmethod
+	def execute(self):
+		pass
+
+	@abc.abstractmethod
+	def check(self):
+		pass
+
+	@abc.abstractmethod
+	def reset(self):
+		pass
+
+class IterationController(Controller):
+	def __init__(self, name, max_ite=30):
+		super().__init__(name)
+		self.max_ite = max_ite
+		self.variable = 0
+
+	def execute(self):
+		self.variable += 1
+
+	def reset(self):
+		self.variable = 0
+
+	def check(self):
+		return self.variable <= self.max_ite
+
+class ErrorController(Controller):
+	def __init__(self, name, model, tol=1e-9):
+		super().__init__(name)
+		self.model = model
+		self.tol = tol
+		self.variable = 2*tol
+
+	def reset(self):
+		self.variable = 2*self.tol
+
+	def execute(self):
+		self.variable = np.linalg.norm(self.model.u.vector() - self.model.u_k.vector()) / np.linalg.norm(self.model.u.vector())
+
+	def check(self):
+		return self.variable < self.tol
+
+
+class TimeController(Controller):
+	def __init__(self, name, time_handler):
+		super().__init__(name)
+		self.time_handler = time_handler
+		self.variable = self.time_handler.time
+
+	def reset(self):
+		self.variable = self.time_handler.time
+
+	def execute(self):
+		pass
+
+	def check(self):
+		return False

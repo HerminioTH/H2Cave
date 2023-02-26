@@ -1,7 +1,7 @@
 from fenics import *
 import numpy as np
 import sympy as sy
-from abc import ABC, abstractmethod
+import abc
 
 sec = 1.
 minute = 60*sec
@@ -44,18 +44,17 @@ def local_projection(tensor, V):
 
 
 class BaseModel():
-	def __init__(self, du, v, dx, TensorSpace):
-		self.du = du
-		self.v = v
-		self.dx = dx
-		self.TS = TensorSpace
+	def __init__(self, fem_handler):
+		self.du = fem_handler.du
+		self.v = fem_handler.v
+		self.dx = fem_handler.dx
+		self.TS = fem_handler.TS
 		self.initialize_tensors()
 
 	def initialize_tensors(self):
 		zero_tensor = Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","0.0")), degree=0)
 		self.stress = local_projection(zero_tensor, self.TS)
 		self.eps_tot = local_projection(zero_tensor, self.TS)
-		self.eps_e = local_projection(zero_tensor, self.TS)
 
 	def build_A(self, **kwargs):
 		pass
@@ -67,21 +66,54 @@ class BaseModel():
 		self.eps_tot.assign(local_projection(epsilon(u), self.TS))
 
 
+class ElasticModel(BaseModel):
+	def __init__(self, fem_handler, settings):
+		super().__init__(fem_handler)
+		self.props = props
+		self.name = "elastic"
+		self.A = 0
+		self.b = 0
+
+		self.__initialize_tensors()
+		self.__load_props(settings)
+		self.__compute_C0()
+
+	def build_A(self):
+		if self.props["active"]:
+			a_form = inner(sigma(self.C0, epsilon(self.du)), epsilon(self.v))*self.dx
+			self.A = assemble(a_form)
+
+	def build_b(self):
+		pass
+
+	def __initialize_tensors(self):
+		zero_tensor = Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","0.0")), degree=0)
+		self.eps_e = local_projection(zero_tensor, self.TS)
+
+	def __load_props(self):
+		self.E0 = Constant(self.props["E0"])
+		self.nu0 = Constant(self.props["nu0"])
+
+	def __compute_C0(self):
+		C0_sy = self.__constitutive_matrix_sy(self.E0, self.nu0)
+		self.C0 = as_matrix(Constant(np.array(C0_sy).astype(np.float64)))
+
+
+class ViscoelasticModel(BaseModel):
+	def __init__(self, settings, ):
+
 class ViscoElasticModel(BaseModel):
 	def __init__(self, props, theta, du, v, dx, TensorSpace, active=True):
 		super().__init__(du, v, dx, TensorSpace)
 		self.props = props
 		self.theta = theta
 		self.name = "viscoelastic"
-		self.first_call_A = True
+		self.A = 0
+		self.b = 0
 
 		self.__initialize_tensors()
 		self.__load_props()
 		self.compute_C0_C1()
-
-	def build_A_elastic(self):
-		a_form = inner(sigma(self.C0, epsilon(self.du)), epsilon(self.v))*self.dx
-		self.A_elastic = assemble(a_form)
 
 	def build_A(self):
 		if self.props["active"]:
@@ -270,51 +302,56 @@ class CreepPressureSolution():
 
 
 
-class FemHandler():
-	def __init__(self, grid):
-		self.grid = grid
-		self.dx = Measure("dx", domain=self.grid.mesh, subdomain_data=self.grid.subdomains)
-		self.ds = Measure("ds", domain=self.grid.mesh, subdomain_data=self.grid.boundaries)
-		self.V = VectorFunctionSpace(self.grid.mesh, "CG", 1)
-		self.TS = TensorFunctionSpace(self.grid.mesh, "DG", 0)
-		self.du = TrialFunction(self.V)
-		self.v = TestFunction(self.V)
-		self.v_n = dot(self.v, FacetNormal(self.grid.mesh))
 
-class BoundaryConditionHandler():
-	def __init__(self, fem_handler, settings):
+
+
+class BaseModel(metaclass=abc.ABCMeta):
+	@abc.abstractmethod
+	def __init__(self, fem_handler, bc_handler, settings):
 		self.fem_handler = fem_handler
-		self.boundaryConditions = settings["BoundaryConditions"]
+		self.bc_handler = bc_handler
+		self.settings = settings
 
-	def update_Dirichlet_BC(self, time_handler):
-		self.bcs = []
-		index_dict = {"u_x": 0, "u_y": 1, "u_z": 2}
-		for key_0, value_0 in self.boundaryConditions.items():
-			u_i = index_dict[key_0]
-			for BOUNDARY_NAME, VALUES in value_0.items():
-				if VALUES["type"] == "DIRICHLET":
-					value = Constant(VALUES["value"][time_handler.idx])
-					self.bcs.append(
-									DirichletBC(
-												self.fem_handler.V.sub(u_i),
-												value,
-												self.fem_handler.grid.boundaries,
-												self.fem_handler.grid.dolfin_tags[self.fem_handler.grid.boundary_dim][BOUNDARY_NAME]
-									)
-					)
+	@abc.abstractmethod
+	def initialize(self):
+		pass
 
-	def update_Neumann_BC(self, time_handler):
-		L_bc = 0
-		for key_0, value_0 in self.boundaryConditions.items():
-			for BOUNDARY_NAME, VALUES in value_0.items():
-				if VALUES["type"] == "NEUMANN":
-					load = Constant(VALUES["value"][time_handler.idx])
-					L_bc += load*self.fem_handler.v_n*self.fem_handler.ds(self.fem_handler.grid.dolfin_tags[self.fem_handler.grid.boundary_dim][BOUNDARY_NAME])
-		self.b_bc = assemble(L_bc)
+	@abc.abstractmethod
+	def execute_first_time_procedure(self, time_handler):
+		pass
 
-	def update_BCs(self, time_handler):
-		self.update_Neumann_BC(time_handler)
-		self.update_Dirichlet_BC(time_handler)
+	@abc.abstractmethod
+	def execute_iterative_procedure(self, time_handler):
+		pass
+
+	@abc.abstractmethod
+	def execute_second_time_procedure(self, time_handler):
+		pass
+
+	@abc.abstractmethod
+	def compute_stress(self):
+		pass
+
+
+def MySaltModel(BaseModel):
+	def __init__(self, fem_handler, bc_handler, settings):
+		super().__init__(fem_handler, bc_handler, settings)
+		self.__initialize_solution_vector()
+		self.elastic_element = None
+		self.viscoelastic_element = None
+
+	def __initialize_solution_vector(self):
+		self.u = Function(self.fem_handler.V)
+		self.u_k = Function(self.fem_handler.V)
+		self.u.rename("Displacement", "m")
+		self.u_k.rename("Displacement", "m")
+
+	def set_elastic_element(self, elastic_element):
+		self.elastic_element = elastic_element
+
+	def set_viscoelastic_element(self, viscoelastic_element):
+		self.viscoelastic_element = viscoelastic_element
+
 
 
 
@@ -454,7 +491,7 @@ class SaltModel():
 
 	def define_outward_directions(self):
 		norm = FacetNormal(self.grid.mesh)
-		self.v_n = dot(self.v, norm)
+		self.n = dot(self.v, norm)
 
 	def define_viscoelastic_model(self):
 		self.model_v = ViscoElasticModel(self.settings["Viscoelastic"], self.settings["Time"]["theta"], self.du, self.v, self.dx, self.TS)
@@ -484,7 +521,7 @@ class SaltModel():
 			for BOUNDARY_NAME, VALUES in value_0.items():
 				if VALUES["type"] == "NEUMANN":
 					load = Constant(VALUES["value"][time_handler.idx])
-					L_bc += load*self.v_n*self.ds(self.grid.dolfin_tags[self.grid.boundary_dim][BOUNDARY_NAME])
+					L_bc += load*self.n*self.ds(self.grid.dolfin_tags[self.grid.boundary_dim][BOUNDARY_NAME])
 		self.b_bc = assemble(L_bc)
 
 	def update_BCs(self, time_handler):

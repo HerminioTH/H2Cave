@@ -56,3 +56,15 @@ class GridHandler(object):
 		self.Ly = self.mesh.coordinates()[:,1].max() - self.mesh.coordinates()[:,1].min()
 		self.Lz = self.mesh.coordinates()[:,2].max() - self.mesh.coordinates()[:,2].min()
 
+	def get_boundaries(self):
+		return self.boundaries
+
+	def get_boundary_tags(self, BOUNDARY_NAME):
+		if BOUNDARY_NAME == None:
+			return None
+		else:
+			return self.dolfin_tags[self.boundary_dim][BOUNDARY_NAME]
+
+	def get_domain_tags(self, DOMAIN_NAME):
+		return self.dolfin_tags[self.domain_dim][DOMAIN_NAME]
+
