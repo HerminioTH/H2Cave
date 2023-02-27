@@ -35,9 +35,9 @@ class BaseElement(metaclass=abc.ABCMeta):
 
 
 class ElasticElement(BaseElement):
-	def __init__(self, fem_handler, settings, model_name="Elastic"):
+	def __init__(self, fem_handler, settings, element_name="Elastic"):
 		super().__init__(fem_handler)
-		self.model_name = model_name
+		self.element_name = element_name
 		self.settings = settings
 		self.A = 0
 		self.b = 0
@@ -69,8 +69,8 @@ class ElasticElement(BaseElement):
 		self.stress = local_projection(zero_tensor, self.TS)
 
 	def __load_props(self):
-		self.E = Constant(self.settings[self.model_name]["E"])
-		self.nu = Constant(self.settings[self.model_name]["nu"])
+		self.E = Constant(self.settings[self.element_name]["E"])
+		self.nu = Constant(self.settings[self.element_name]["nu"])
 
 	def __initialize_constitutive_matrices(self):
 		self.C0_sy = constitutive_matrix_sy(self.E, self.nu)
@@ -78,9 +78,9 @@ class ElasticElement(BaseElement):
 
 
 class ViscoelasticElement(BaseElement):
-	def __init__(self, fem_handler, settings, model_name="Viscoelastic"):
+	def __init__(self, fem_handler, settings, element_name="Viscoelastic"):
 		super().__init__(fem_handler)
-		self.model_name = model_name
+		self.element_name = element_name
 		self.theta = settings["Time"]["theta"]
 		self.A = 0
 		self.b = 0
@@ -157,11 +157,11 @@ class ViscoelasticElement(BaseElement):
 		self.eps_tot_old = local_projection(zero_tensor, self.TS)
 
 	def __load_props(self, settings):
-		self.E0 = Constant(settings[self.model_name]["E0"])
-		self.nu0 = Constant(settings[self.model_name]["nu0"])
-		self.E1 = Constant(settings[self.model_name]["E1"])
-		self.nu1 = Constant(settings[self.model_name]["nu1"])
-		self.eta = Constant(settings[self.model_name]["eta"])
+		self.E0 = Constant(settings[self.element_name]["E0"])
+		self.nu0 = Constant(settings[self.element_name]["nu0"])
+		self.E1 = Constant(settings[self.element_name]["E1"])
+		self.nu1 = Constant(settings[self.element_name]["nu1"])
+		self.eta = Constant(settings[self.element_name]["eta"])
 
 
 	def __initialize_constitutive_matrices(self):
@@ -178,4 +178,9 @@ class ViscoelasticElement(BaseElement):
 
 
 # class Dashpot(BaseElement):
-# 	def __init__(self):
+# 	def __init__(self, fem_handler, settings, element_name="Dashpot"):
+# 		super().__init__(fem_handler)
+# 		self.settings = settings
+# 		self.element_name = element_name
+
+# 	def build_b(self):

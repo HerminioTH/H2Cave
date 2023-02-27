@@ -10,7 +10,7 @@ from Time import TimeHandler
 from FiniteElements import FemHandler
 from BoundaryConditions import MechanicsBoundaryConditions
 from Simulators import Simulator
-from ModelCompositions import ViscoelasticModel
+from Models import ViscoelasticModel
 from Utils import *
 
 def main():

@@ -9,8 +9,8 @@ from Controllers import TimeController
 from Time import TimeHandler
 from FiniteElements import FemHandler
 from BoundaryConditions import MechanicsBoundaryConditions
-from Simulators import Simulator_3
-from ModelCompositions import ElasticModel
+from Simulators import Simulator
+from Models import ElasticModel
 from Utils import *
 
 def main():
@@ -90,7 +90,7 @@ def main():
 	screen_monitor.add_controller(time_controller, width=10, align="center")
 
 	# Define simulator
-	sim = Simulator_3(time_handler)
+	sim = Simulator(time_handler)
 
 	# Add models
 	sim.add_model(model)
