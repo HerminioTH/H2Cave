@@ -26,7 +26,7 @@ class BaseElement(metaclass=abc.ABCMeta):
 	def build_b(self, **kwargs):
 		pass
 
-	@abc.abstractmethod
+	# @abc.abstractmethod
 	def compute_stress(self, **kwargs):
 		pass
 
@@ -38,12 +38,11 @@ class ElasticElement(BaseElement):
 	def __init__(self, fem_handler, settings, element_name="Elastic"):
 		super().__init__(fem_handler)
 		self.element_name = element_name
-		self.settings = settings
 		self.A = 0
 		self.b = 0
 
 		self.__initialize_tensors()
-		self.__load_props()
+		self.__load_props(settings)
 		self.__initialize_constitutive_matrices()
 
 	def build_A(self):
@@ -68,9 +67,9 @@ class ElasticElement(BaseElement):
 		self.eps_e = local_projection(zero_tensor, self.TS)
 		self.stress = local_projection(zero_tensor, self.TS)
 
-	def __load_props(self):
-		self.E = Constant(self.settings[self.element_name]["E"])
-		self.nu = Constant(self.settings[self.element_name]["nu"])
+	def __load_props(self, settings):
+		self.E = Constant(settings[self.element_name]["E"])
+		self.nu = Constant(settings[self.element_name]["nu"])
 
 	def __initialize_constitutive_matrices(self):
 		self.C0_sy = constitutive_matrix_sy(self.E, self.nu)
@@ -177,10 +176,46 @@ class ViscoelasticElement(BaseElement):
 
 
 
-# class Dashpot(BaseElement):
-# 	def __init__(self, fem_handler, settings, element_name="Dashpot"):
-# 		super().__init__(fem_handler)
-# 		self.settings = settings
-# 		self.element_name = element_name
+class DashpotElement(BaseElement):
+	def __init__(self, fem_handler, settings, element_name="Dashpot"):
+		super().__init__(fem_handler)
+		self.element_name = element_name
+		self.theta = settings["Time"]["theta"]
+		self.__load_props(settings)
+		self.__initialize_constitutive_matrices()
+		self.__initialize_tensors()
 
-# 	def build_b(self):
+	def build_A(self):
+		pass
+
+	def build_b(self):
+		b_form = inner(sigma(self.C0, self.eps_ie), epsilon(self.v))*self.dx
+		self.b = assemble(b_form)
+
+	def update(self):
+		self.eps_ie_old.assign(self.eps_ie)
+		self.eps_ie_rate_old.assign(self.eps_ie_rate)
+
+	def compute_viscous_strain(self, stress, dt):
+		self.__compute_viscous_strain_rate(stress)
+		self.eps_ie.assign(local_projection(self.eps_ie_old + dt*(self.theta*self.eps_ie_rate_old + (1 - self.theta)*self.eps_ie_rate), self.TS))
+
+	def __compute_viscous_strain_rate(self, stress):
+		self.eps_ie_rate.assign(local_projection((1/self.eta)*stress, self.TS))
+
+	def __load_props(self, settings):
+		self.E0 = Constant(settings["Elastic"]["E"])
+		self.nu0 = Constant(settings["Elastic"]["nu"])
+		self.eta = Constant(settings[self.element_name]["eta"])
+
+	def __initialize_constitutive_matrices(self):
+		C0_sy = constitutive_matrix_sy(self.E0, self.nu0)
+		self.C0 = as_matrix(Constant(np.array(C0_sy).astype(np.float64)))
+
+	def __initialize_tensors(self,):
+		zero_tensor = Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","0.0")), degree=0)
+		self.eps_e = local_projection(zero_tensor, self.TS)
+		self.eps_ie = local_projection(zero_tensor, self.TS)
+		self.eps_ie_old = local_projection(zero_tensor, self.TS)
+		self.eps_ie_rate = local_projection(zero_tensor, self.TS)
+		self.eps_ie_rate_old = local_projection(zero_tensor, self.TS)

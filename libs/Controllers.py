@@ -1,5 +1,6 @@
 import abc
 import numpy as np
+from fenics import as_backend_type
 
 class Controller(metaclass=abc.ABCMeta):
 	@abc.abstractmethod
@@ -32,23 +33,34 @@ class IterationController(Controller):
 		self.variable = 0
 
 	def check(self):
-		return self.variable <= self.max_ite
+		return self.variable < self.max_ite
+		# if self.variable >= 3:
+		# 	# print(self.variable)
+		# 	return self.variable < self.max_ite
+		# else:
+		# 	return True
 
 class ErrorController(Controller):
 	def __init__(self, name, model, tol=1e-9):
 		super().__init__(name)
 		self.model = model
 		self.tol = tol
-		self.variable = 2*tol
+		self.variable = 20*tol
+		self.ite = 0
 
 	def reset(self):
-		self.variable = 2*self.tol
+		self.ite = 0
+		self.variable = 20*self.tol
 
 	def execute(self):
-		self.variable = np.linalg.norm(self.model.u.vector() - self.model.u_k.vector()) / np.linalg.norm(self.model.u.vector())
+		self.ite += 1
+		self.variable = np.linalg.norm(self.model.u_k.vector() - self.model.u.vector()) / np.linalg.norm(self.model.u.vector())
 
 	def check(self):
-		return self.variable < self.tol
+		if self.ite >= 3: # Iterate at least 2 times
+			return self.variable > self.tol
+		else:
+			return True
 
 
 class TimeController(Controller):

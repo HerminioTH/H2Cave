@@ -61,14 +61,15 @@ class TensorSaver():
 			"22": []
 		}
 
-	def get_average(self, tensor):
-		return self.fe.assemble(tensor*self.dx)/self.vol
+	def get_average(self, sigma_ij):
+		return self.fe.assemble(sigma_ij*self.dx)/self.vol
 
 	def record_average(self, tensor, t):
 		self.tensor_data["Time"].append(t)
 		for i in range(3):
 			for j in range(3):
-				avg_value = self.get_average(tensor[i,j])
+				sigma_ij = tensor[i,j]
+				avg_value = self.get_average(sigma_ij)
 				self.tensor_data[f"{i}{j}"].append(avg_value)
 
 	def save(self, output_folder):

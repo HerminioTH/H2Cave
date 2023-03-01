@@ -15,9 +15,13 @@ class Simulator():
 		for model in self.models:
 			model.execute_model_post(self.time_handler)
 
-	def execute_iteration_loop_procedures(self):
+	def execute_iterative_procedures(self):
 		for model in self.models:
-			model.execute_iteration_loop_procedure(self.time_handler)		
+			model.execute_iterative_procedure(self.time_handler)
+
+	def update_solution_vector(self):
+		for model in self.models:
+			model.update_solution_vector()
 
 	def add_model(self, model):
 		self.models.append(model)
@@ -79,7 +83,8 @@ class Simulator():
 
 			# Begin iterative loop
 			while self.check_controllers():
-				self.execute_iteration_loop_procedures()
+				self.update_solution_vector()
+				self.execute_iterative_procedures()
 				self.execute_controllers()
 
 			self.execute_models_post()

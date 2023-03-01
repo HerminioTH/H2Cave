@@ -31,12 +31,30 @@ class BaseModel(metaclass=abc.ABCMeta):
 
 	# @abc.abstractmethod
 	# def compute_stress(self):
-	# 	pass
+	# 	pass", "m")
 
-class ElasticModel(BaseModel):
+class MechanicsModel(BaseModel):
 	def __init__(self, fem_handler, bc_handler, settings):
 		super().__init__(fem_handler, bc_handler, settings)
 		self.__initialize_solution_vector()
+
+	def __initialize_solution_vector(self):
+		self.u = Function(self.fem_handler.V)
+		self.u_k = Function(self.fem_handler.V)
+		# self.u_k = interpolate(Constant((0.0, 0.0, 0.0)), self.fem_handler.V)
+		self.u.rename("Displacement", "m")
+		# self.u_k.rename("Displacement", "m")
+
+	def update_solution_vector(self):
+		self.u_k.assign(self.u)
+		# self.u_k.vector().set_local(self.u.vector())
+		# self.u_k = self.u.copy()
+		# self.u_k.assign(self.u)
+		# self.u_k = self.u.vector().array()
+
+class ElasticModel(MechanicsModel):
+	def __init__(self, fem_handler, bc_handler, settings):
+		super().__init__(fem_handler, bc_handler, settings)
 		self.elastic_element = ElasticElement(self.fem_handler, self.settings, element_name="Elastic")
 
 	def initialize(self, time_handler):
@@ -72,25 +90,15 @@ class ElasticModel(BaseModel):
 		[bc.apply(A, b) for bc in self.bc_handler.bcs]
 		solve(A, self.u.vector(), b, "cg", "ilu")
 
-	def __initialize_solution_vector(self):
-		self.u = Function(self.fem_handler.V)
-		self.u_k = Function(self.fem_handler.V)
-		self.u.rename("Displacement", "m")
-		self.u_k.rename("Displacement", "m")
 
-
-class ViscoelasticModel(BaseModel):
+class ViscoelasticModel(MechanicsModel):
 	def __init__(self, fem_handler, bc_handler, settings):
 		super().__init__(fem_handler, bc_handler, settings)
-		self.__initialize_solution_vector()
 		self.viscoelastic_element = ViscoelasticElement(self.fem_handler, self.settings)
 
 	def initialize(self, time_handler):
-		pass
-		# self.__solve_elastic_model(time_handler)
-		# self.viscoelastic_element.compute_total_strain(self.u)
-		# self.viscoelastic_element.compute_elastic_strain()
-		# self.viscoelastic_element.compute_stress()
+		# Stiffness matrix
+		self.viscoelastic_element.build_A()
 
 	def execute_iterative_procedure(self, time_handler):
 		pass
@@ -104,15 +112,11 @@ class ViscoelasticModel(BaseModel):
 		self.viscoelastic_element.build_b()
 		b = self.bc_handler.b + self.viscoelastic_element.b
 
-		# Stiffness matrix
-		self.viscoelastic_element.build_A()
-		A = self.viscoelastic_element.A
-
 		# Apply boundary conditions
-		[bc.apply(A, b) for bc in self.bc_handler.bcs]
+		[bc.apply(self.viscoelastic_element.A, b) for bc in self.bc_handler.bcs]
 
 		# Solve instantaneous elastic problem
-		solve(A, self.u.vector(), b, "cg", "ilu")
+		solve(self.viscoelastic_element.A, self.u.vector(), b, "cg", "ilu")
 
 		# Compute strains
 		self.viscoelastic_element.compute_total_strain(self.u)
@@ -127,12 +131,6 @@ class ViscoelasticModel(BaseModel):
 
 	def execute_model_post(self, time_handler):
 		pass
-
-	def __initialize_solution_vector(self):
-		self.u = Function(self.fem_handler.V)
-		self.u_k = Function(self.fem_handler.V)
-		self.u.rename("Displacement", "m")
-		self.u_k.rename("Displacement", "m")
 
 	def __solve_elastic_model(self, time_handler):
 		# rhs vector
@@ -150,17 +148,58 @@ class ViscoelasticModel(BaseModel):
 		solve(A, self.u.vector(), b, "cg", "ilu")
 
 
-
-class BurgersModel(BaseModel):
+class MaxwellModel(MechanicsModel):
 	def __init__(self, fem_handler, bc_handler, settings):
 		super().__init__(fem_handler, bc_handler, settings)
-		self.__initialize_solution_vector()
+		self.elastic_element = ElasticElement(self.fem_handler, self.settings, element_name="Elastic")
+		self.dashpot_element = DashpotElement(self.fem_handler, self.settings, element_name="Dashpot")
+
+	def initialize(self, time_handler):
+		# Stiffness matrix
+		self.elastic_element.build_A()
+
+	def execute_model_pre(self, time_handler):
+		# Update boundary condition
+		self.bc_handler.update_BCs(time_handler)
+
+	def execute_iterative_procedure(self, time_handler):
+		# rhs vector
+		self.dashpot_element.build_b()
+		b = self.bc_handler.b + self.dashpot_element.b
+
+		# Solve linear system
+		self.__solve_linear_system(self.elastic_element.A, b)
+		# print(np.linalg.norm(self.u.vector()), np.linalg.norm(self.u_k.vector()))
+
+		# Compute total strain
+		self.elastic_element.compute_total_strain(self.u)
+
+		# Compute elastic strain
+		self.elastic_element.compute_elastic_strain(eps_ie=self.dashpot_element.eps_ie)
+
+		# Compute stress
+		self.elastic_element.compute_stress()
+
+		# Compute inelastic strain
+		self.dashpot_element.compute_viscous_strain(self.elastic_element.stress, time_handler.time_step)
+
+	def execute_model_post(self, time_handler):
+		self.dashpot_element.update()
+
+	def __solve_linear_system(self, A, b):
+		[bc.apply(A, b) for bc in self.bc_handler.bcs]
+		solve(A, self.u.vector(), b, "cg", "ilu")
+
+
+
+class BurgersModel(MechanicsModel):
+	def __init__(self, fem_handler, bc_handler, settings):
+		super().__init__(fem_handler, bc_handler, settings)
 		self.viscoelastic_element = ViscoelasticElement(self.fem_handler, self.settings)
-		self.inelastic_elemens = []
+		self.inelastic_elements = []
 
 	def add_inelastic_element(self, element_name):
 		self.settings[self.element_name]["E"]
-
 		self.inelastic_elements.append(inelastic_element)
 
 	def initialize(self, time_handler):
@@ -205,12 +244,6 @@ class BurgersModel(BaseModel):
 
 	def execute_model_post(self, time_handler):
 		pass
-
-	def __initialize_solution_vector(self):
-		self.u = Function(self.fem_handler.V)
-		self.u_k = Function(self.fem_handler.V)
-		self.u.rename("Displacement", "m")
-		self.u_k.rename("Displacement", "m")
 
 	def __solve_elastic_model(self, time_handler):
 		# rhs vector
