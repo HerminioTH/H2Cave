@@ -4,42 +4,42 @@ import numpy as np
 import pandas as pd
 from abc import ABC, abstractmethod
 
-class Saver():
-	@abstractmethod
-	def record(self):
-		pass
+# class Saver():
+# 	@abstractmethod
+# 	def record(self):
+# 		pass
 
-	@abstractmethod
-	def save(self):
-		pass
+# 	@abstractmethod
+# 	def save(self):
+# 		pass
 
-class AverageSaver(Saver):
-	def __init__(self, dx, field_name, field, time_handler, output_folder):
-		self.saver = TensorSaver(field_name, dx)
-		self.field = field
-		self.time_handler = time_handler
-		self.output_folder = output_folder
+# class AverageSaver(Saver):
+# 	def __init__(self, dx, field_name, field, time_handler, output_folder):
+# 		self.saver = TensorSaver(field_name, dx)
+# 		self.field = field
+# 		self.time_handler = time_handler
+# 		self.output_folder = output_folder
 
-	def record(self):
-		self.saver.record_average(self.field, self.time_handler.time)
+# 	def record(self):
+# 		self.saver.record_average(self.field, self.time_handler.time)
 
-	def save(self):
-		self.saver.save(os.path.join(self.output_folder, "avg"))
+# 	def save(self):
+# 		self.saver.save(os.path.join(self.output_folder, "avg"))
 
-class VtkSaver(Saver):
-	def __init__(self, field_name, field, time_handler, output_folder):
-		from fenics import File
-		self.field = field
-		self.time_handler = time_handler
-		self.output_folder = output_folder
-		self.vtk = File(os.path.join(output_folder, f"{field_name}.pvd"))
-		# self.vtk = File(os.path.join(output_folder, "vtk", f"{field_name}.pvd"))
+# class VtkSaver(Saver):
+# 	def __init__(self, field_name, field, time_handler, output_folder):
+# 		from fenics import File
+# 		self.field = field
+# 		self.time_handler = time_handler
+# 		self.output_folder = output_folder
+# 		self.vtk = File(os.path.join(output_folder, f"{field_name}.pvd"))
+# 		# self.vtk = File(os.path.join(output_folder, "vtk", f"{field_name}.pvd"))
 
-	def record(self):
-		self.vtk << (self.field, self.time_handler.time)
+# 	def record(self):
+# 		self.vtk << (self.field, self.time_handler.time)
 
-	def save(self):
-		pass
+# 	def save(self):
+# 		pass
 
 class TensorSaver():
 	def __init__(self, name, dx):
@@ -61,23 +61,21 @@ class TensorSaver():
 			"22": []
 		}
 
-	def get_average(self, tensor):
-		return self.fe.assemble(tensor*self.dx)/self.vol
+	def get_average(self, sigma_ij):
+		return self.fe.assemble(sigma_ij*self.dx)/self.vol
 
 	def record_average(self, tensor, t):
 		self.tensor_data["Time"].append(t)
 		for i in range(3):
 			for j in range(3):
-				avg_value = self.get_average(tensor[i,j])
+				sigma_ij = tensor[i,j]
+				avg_value = self.get_average(sigma_ij)
 				self.tensor_data[f"{i}{j}"].append(avg_value)
-
-	def build_dataframe(self):
-		self.df = pd.DataFrame(self.tensor_data)
 
 	def save(self, output_folder):
 		if not os.path.exists(output_folder):
 			os.makedirs(output_folder)
-		self.build_dataframe()
+		self.df = pd.DataFrame(self.tensor_data)
 		self.df.to_excel(os.path.join(output_folder, f"{self.name}.xlsx"))
 		# df.to_csv(os.path.join(output_folder, f"{self.name}.csv"))
 

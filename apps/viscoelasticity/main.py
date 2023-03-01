@@ -2,24 +2,23 @@ from fenics import *
 import os
 import sys
 import numpy as np
-import shutil
-import json
-
 sys.path.append(os.path.join("..", "..", "libs"))
-from GridHandler import GridHandler
+from Grid import GridHandler
 from Events import VtkSaver, AverageSaver, ScreenOutput
-from Controllers import IterationController, ErrorController
-from TimeHandler import TimeHandler
-from SimulationHandler import Simulator_3
-from Models import *
-
+from Controllers import TimeController
+from Time import TimeHandler
+from FiniteElements import FemHandler
+from BoundaryConditions import MechanicsBoundaryConditions
+from Simulators import Simulator
+from Models import ViscoelasticModel
+from Utils import *
 
 def main():
 	# Define settings
 	time_list = np.linspace(0, 800*hour, 50)
 	settings = {
 		"Paths" : {
-			"Output": "output/case_2",
+			"Output": "output/case_1",
 			"Grid": "../../grids/quarter_cylinder_0",
 		},
 		"Time" : {
@@ -28,21 +27,12 @@ def main():
 			"finalTime": 800*hour,
 			"theta": 0.5,
 		},
-		"Elastic" : {
-			"E": 2*GPa,
-			"nu": 0.3
-		}
 		"Viscoelastic" : {
-			"active": True,
-			"E": 2*GPa,
-			"nu": 0.3,
+			"E0": 2*GPa,
+			"nu0": 0.3,
+			"E1": 2*GPa,
+			"nu1": 0.3,
 			"eta": 5e14
-		},
-		"DislocationCreep" : {
-			"active": True,
-			"A": 5.2e-36,
-			"n": 5.0,
-			"T": 298
 		},
 		"BoundaryConditions" : {
 			"u_x" : {
@@ -65,6 +55,7 @@ def main():
 				"OUTSIDE": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
 				"BOTTOM":	{"type": "DIRICHLET", 	"value": np.repeat(0.0, len(time_list))},
 				"TOP": 		{"type": "NEUMANN", 	"value": np.repeat(-12*MPa, len(time_list))}
+				# "TOP": 		{"type": "NEUMANN", 	"value": np.linspace(-12*MPa, -15*MPa, len(time_list))}
 			}
 		}
 	}
@@ -84,48 +75,48 @@ def main():
 	fem_handler = FemHandler(grid)
 
 	# Define boundary condition handler
-	bc_handler = BoundaryConditionHandler(fem_handler, settings)
+	bc_handler = MechanicsBoundaryConditions(fem_handler, settings)
 
-	# Build salt model
-	salt = SaltModel_2(fem_handler, bc_handler, settings)
+	# Define model
+	model = ViscoelasticModel(fem_handler, bc_handler, settings)
 
 	# Controllers
-    iteration_controller = IterationController("Ite", max_ite=1e-9)
-    error_controller = ErrorController("Error", salt, tol=1e-7)
-
+	time_controller = TimeController("Time", time_handler)
 
 	# Events
-	avg_eps_tot_saver = AverageSaver(fem_handler.dx, "eps_tot", salt.model_v.eps_tot, time_handler, output_folder)
-	avg_eps_v_saver = AverageSaver(fem_handler.dx, "eps_v", salt.model_v.eps_v, time_handler, output_folder)
-	avg_eps_e_saver = AverageSaver(fem_handler.dx, "eps_e", salt.model_v.eps_e, time_handler, output_folder)
-	avg_eps_cr_saver = AverageSaver(fem_handler.dx, "eps_cr", salt.model_c.eps_cr, time_handler, output_folder)
+	avg_eps_tot_saver = AverageSaver(fem_handler.dx(), "eps_tot", model.viscoelastic_element.eps_tot, time_handler, output_folder)
+	avg_eps_e_saver = AverageSaver(fem_handler.dx(), "eps_e", model.viscoelastic_element.eps_e, time_handler, output_folder)
+	avg_eps_v_saver = AverageSaver(fem_handler.dx(), "eps_v", model.viscoelastic_element.eps_v, time_handler, output_folder)
 
-	vtk_u_saver = VtkSaver("displacement", salt.u, time_handler, output_folder)
-	vtk_stress_saver = VtkSaver("stress", salt.model_v.stress, time_handler, output_folder)
-	vtk_eps_tot_saver = VtkSaver("eps_tot", salt.model_v.eps_tot, time_handler, output_folder)
+	vtk_u_saver = VtkSaver("displacement", model.u, time_handler, output_folder)
+	vtk_stress_saver = VtkSaver("stress", model.viscoelastic_element.stress, time_handler, output_folder)
+	vtk_eps_e_saver = VtkSaver("eps_e", model.viscoelastic_element.eps_e, time_handler, output_folder)
+	vtk_eps_v_saver = VtkSaver("eps_v", model.viscoelastic_element.eps_v, time_handler, output_folder)
 
-
+	screen_monitor = ScreenOutput()
+	screen_monitor.add_controller(time_controller, width=20, align="center")
 
 	# Define simulator
-	sim = Simulator_3(salt, time_handler)
+	sim = Simulator(time_handler)
+
+	# Add models
+	sim.add_model(model)
 
 	# Add events
 	sim.add_event(avg_eps_tot_saver)
-	sim.add_event(avg_eps_v_saver)
 	sim.add_event(avg_eps_e_saver)
-	sim.add_event(avg_eps_cr_saver)
+	sim.add_event(avg_eps_v_saver)
 	sim.add_event(vtk_u_saver)
-	sim.add_event(vtk_eps_tot_saver)
+	sim.add_event(vtk_stress_saver)
+	sim.add_event(vtk_eps_e_saver)
+	sim.add_event(vtk_eps_v_saver)
+	sim.add_event(screen_monitor)
 
-	# Run simulation
+	# Add controllers
+	sim.add_controller(time_controller)
+
+	# Run simulator
 	sim.run()
-
-
-
-
-
-
-
 
 if __name__ == "__main__":
 	main()
