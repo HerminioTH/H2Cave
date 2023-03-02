@@ -97,9 +97,19 @@ class ViscoelasticModel(MechanicsModel):
 		self.viscoelastic_element = ViscoelasticElement(self.fem_handler, self.settings)
 
 	def initialize(self, time_handler):
-		# # Stiffness matrix
-		# self.viscoelastic_element.build_A_elastic()
 		pass
+		# self.__solve_elastic_model(time_handler)
+
+		# # Compute strains
+		# self.viscoelastic_element.compute_total_strain(self.u)
+		# # self.viscoelastic_element.compute_viscoelastic_strain()
+		# self.viscoelastic_element.compute_elastic_strain()
+
+		# # Compute stress
+		# self.viscoelastic_element.compute_stress()
+
+		# # Update fields
+		# self.viscoelastic_element.update()
 
 	def execute_iterative_procedure(self, time_handler):
 		pass

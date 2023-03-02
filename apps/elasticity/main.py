@@ -5,7 +5,7 @@ import numpy as np
 sys.path.append(os.path.join("..", "..", "libs"))
 from Grid import GridHandler
 from Events import VtkSaver, AverageSaver, ScreenOutput, TimeLevelCounter
-from Controllers import TimeController, IterationController, ErrorController
+from Controllers import TimeController
 from Time import TimeHandler
 from FiniteElements import FemHandler
 from BoundaryConditions import MechanicsBoundaryConditions
