@@ -78,9 +78,6 @@ def main():
 	bc_handler = MechanicsBoundaryConditions(fem_handler, settings)
 
 
-
-
-	grid = grid
 	dx = Measure("dx", domain=grid.mesh, subdomain_data=grid.subdomains)
 	ds = Measure("ds", domain=grid.mesh, subdomain_data=grid.boundaries)
 	V = VectorFunctionSpace(grid.mesh, "CG", 1)
@@ -131,8 +128,6 @@ def main():
 
 		keep_going = True
 		while keep_going:
-		# while error > tol or ite < ite_max:
-		# while ite < ite_max:
 			b_form = inner(sigma(C0, eps_ie), epsilon(v))*dx
 			b = bc_handler.b + assemble(b_form)
 
@@ -144,10 +139,8 @@ def main():
 			u_old = u_k.vector()
 
 			diff = u_new - u_old
-			# print(diff[:])
 			error = np.linalg.norm(diff)/np.linalg.norm(u_new)
 			ite += 1
-
 
 			eps_tot.assign(local_projection(epsilon(u), TS))
 			eps_e.assign(local_projection(eps_tot - eps_ie, TS))
@@ -178,60 +171,6 @@ def main():
 	avg_eps_e_saver.finalize()
 	avg_eps_ie_saver.finalize()
 
-
-
-
-
-
-
-
-
-	# # Define model
-	# model = MaxwellModel(fem_handler, bc_handler, settings)
-
-	# # Controllers
-	# time_controller = TimeController("Time", time_handler)
-	# iteration_controller = IterationController("Iteration", max_ite=5)
-	# # error_controller = ErrorController("Error", model, tol=1e-8)
-	# error_controller = ErrorController("||u_k - u_k-1||/||u_k||", model, tol=1e-8)
-
-	# # Events
-	# avg_eps_tot_saver = AverageSaver(fem_handler.dx(), "eps_tot", model.dashpot_element.eps_tot, time_handler, output_folder)
-	# avg_eps_e_saver = AverageSaver(fem_handler.dx(), "eps_e", model.dashpot_element.eps_e, time_handler, output_folder)
-	# avg_eps_ie_saver = AverageSaver(fem_handler.dx(), "eps_ie", model.dashpot_element.eps_ie, time_handler, output_folder)
-
-	# vtk_u_saver = VtkSaver("displacement", model.u, time_handler, output_folder)
-	# vtk_stress_saver = VtkSaver("stress", model.dashpot_element.stress, time_handler, output_folder)
-	# vtk_eps_e_saver = VtkSaver("eps_e", model.dashpot_element.eps_e, time_handler, output_folder)
-	# vtk_eps_ie_saver = VtkSaver("eps_ie", model.dashpot_element.eps_ie, time_handler, output_folder)
-
-	# screen_monitor = ScreenOutput()
-	# screen_monitor.add_controller(time_controller, width=10, align="center")
-	# screen_monitor.add_controller(iteration_controller, width=10, align="center")
-	# screen_monitor.add_controller(error_controller, width=30, align="center")
-
-	# # Define simulator
-	# sim = Simulator(time_handler)
-
-	# # Add models
-	# sim.add_model(model)
-
-	# # Add events
-	# sim.add_event(avg_eps_tot_saver)
-	# sim.add_event(avg_eps_e_saver)
-	# sim.add_event(avg_eps_ie_saver)
-	# sim.add_event(vtk_u_saver)
-	# sim.add_event(vtk_stress_saver)
-	# sim.add_event(vtk_eps_e_saver)
-	# sim.add_event(vtk_eps_ie_saver)
-	# sim.add_event(screen_monitor)
-
-	# # Add controllers
-	# sim.add_controller(iteration_controller)
-	# sim.add_controller(error_controller)
-
-	# # Run simulator
-	# sim.run()
 
 if __name__ == "__main__":
 	main()
