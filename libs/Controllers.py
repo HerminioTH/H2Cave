@@ -34,11 +34,6 @@ class IterationController(Controller):
 
 	def check(self):
 		return self.variable < self.max_ite
-		# if self.variable >= 3:
-		# 	# print(self.variable)
-		# 	return self.variable < self.max_ite
-		# else:
-		# 	return True
 
 class ErrorController(Controller):
 	def __init__(self, name, model, tol=1e-9):
@@ -62,7 +57,6 @@ class ErrorController(Controller):
 		else:
 			return True
 
-
 class TimeController(Controller):
 	def __init__(self, name, time_handler):
 		super().__init__(name)
@@ -70,7 +64,8 @@ class TimeController(Controller):
 		self.variable = self.time_handler.time
 
 	def reset(self):
-		self.variable = self.time_handler.time
+		self.variable = str(self.time_handler.time) + "/" + str(self.time_handler.final_time)
+		# pass
 
 	def execute(self):
 		pass

@@ -78,7 +78,11 @@ class ScreenOutput(Event):
 			for i in range(n):
 				column_width = " {" + ":" + str(self.aligns[i]) + str(self.widths[i]) + "} |"
 				value = str(self.controllers[i].variable)
-				value = float(value[:self.widths[i]])
+				# value = float(value[:self.widths[i]])
+				try:
+					value = float(value[:self.widths[i]])
+				except:
+					value = value[:self.widths[i]]
 				self.row += column_width.format(value)
 		else:
 			column_width = "|{" + ":" + "^" + str((len(self.header)-2)) + "}|"
@@ -120,3 +124,24 @@ class VtkSaver(Event):
 
 	def finalize(self):
 		pass
+
+
+class TimeLevelCounter(Event):
+	def __init__(self, time_handler, name="Time Level"):
+		self.name = name
+		self.counter = 0
+		self.total_steps = len(time_handler.time_list)
+		self.__compose_variable()
+
+	def initialize(self):
+		pass
+
+	def execute(self):
+		self.counter += 1
+		self.__compose_variable()
+
+	def finalize(self):
+		pass
+
+	def __compose_variable(self):
+		self.variable = str(self.counter) + "/" + str(self.total_steps)

@@ -1,5 +1,6 @@
 import fenics as fe
 import sympy as sy
+import json
 
 sec = 1.
 minute = 60*sec
@@ -9,6 +10,15 @@ month = 30*day
 kPa = 1e3
 MPa = 1e6
 GPa = 1e9
+
+def read_json(file_name):
+	with open(file_name, "r") as j_file:
+		data = json.load(j_file)
+	return data
+
+def save_json(data, file_name):
+	with open(file_name, "w") as f:
+	    json.dump(data, f, indent=4)
 
 def strain2voigt(e):
 	x = 1

@@ -4,8 +4,8 @@ import sys
 import numpy as np
 sys.path.append(os.path.join("..", "..", "libs"))
 from Grid import GridHandler
-from Events import VtkSaver, AverageSaver, ScreenOutput
-from Controllers import TimeController
+from Events import VtkSaver, AverageSaver, ScreenOutput, TimeLevelCounter
+from Controllers import TimeController, IterationController, ErrorController
 from Time import TimeHandler
 from FiniteElements import FemHandler
 from BoundaryConditions import MechanicsBoundaryConditions
@@ -13,48 +13,28 @@ from Simulators import Simulator
 from Models import ElasticModel
 from Utils import *
 
+def write_settings(settings):
+	# Define time levels
+	n_steps = 50
+	t_f = 800*hour
+	settings["Time"]["timeList"] = list(np.linspace(0, t_f, n_steps))
+
+	# Define boundary conditions
+	for u_i in settings["BoundaryConditions"].keys():
+		for boundary_name in settings["BoundaryConditions"][u_i]:
+			settings["BoundaryConditions"][u_i][boundary_name]["value"] = list(np.repeat(0.0, n_steps))
+
+	settings["BoundaryConditions"]["u_z"]["TOP"]["value"] = list(np.linspace(-12*MPa, -15*MPa, n_steps))
+
+	# Dump to file
+	save_json(settings, "settings.json")
+
 def main():
-	# Define settings
-	time_list = np.linspace(0, 800*hour, 50)
-	settings = {
-		"Paths" : {
-			"Output": "output/case_1",
-			"Grid": "../../grids/quarter_cylinder_0",
-		},
-		"Time" : {
-			"timeList": time_list,
-			"timeStep": 10*hour,
-			"finalTime": 800*hour,
-			"theta": 0.5,
-		},
-		"Elastic" : {
-			"E": 2*GPa,
-			"nu": 0.3
-		},
-		"BoundaryConditions" : {
-			"u_x" : {
-				"SIDE_X": 	{"type": "DIRICHLET", 	"value": np.repeat(0.0, len(time_list))},
-				"SIDE_Y": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"OUTSIDE": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"BOTTOM":	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"TOP": 		{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))}
-			},
-			"u_y" : {
-				"SIDE_X": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"SIDE_Y": 	{"type": "DIRICHLET", 	"value": np.repeat(0.0, len(time_list))},
-				"OUTSIDE": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"BOTTOM":	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"TOP": 		{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))}
-			},
-			"u_z" : {
-				"SIDE_X": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"SIDE_Y": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"OUTSIDE": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"BOTTOM":	{"type": "DIRICHLET", 	"value": np.repeat(0.0, len(time_list))},
-				"TOP": 		{"type": "NEUMANN", 	"value": np.repeat(-12*MPa, len(time_list))}
-			}
-		}
-	}
+	# Read settings
+	settings = read_json("settings.json")
+
+	# Write settings
+	write_settings(settings)
 
 	# Define folders
 	output_folder = os.path.join(*settings["Paths"]["Output"].split("/"))
@@ -77,7 +57,7 @@ def main():
 	model = ElasticModel(fem_handler, bc_handler, settings)
 
 	# Controllers
-	time_controller = TimeController("Time", time_handler)
+	time_controller = TimeController("Time (s)", time_handler)
 
 	# Events
 	avg_eps_tot_saver = AverageSaver(fem_handler.dx(), "eps_tot", model.elastic_element.eps_tot, time_handler, output_folder)
@@ -86,8 +66,11 @@ def main():
 	vtk_u_saver = VtkSaver("displacement", model.u, time_handler, output_folder)
 	vtk_stress_saver = VtkSaver("stress", model.elastic_element.stress, time_handler, output_folder)
 
+	time_counter = TimeLevelCounter(time_handler)
+
 	screen_monitor = ScreenOutput()
-	screen_monitor.add_controller(time_controller, width=10, align="center")
+	screen_monitor.add_controller(time_counter, width=10, align="center")
+	screen_monitor.add_controller(time_controller, width=30, align="center")
 
 	# Define simulator
 	sim = Simulator(time_handler)
@@ -100,6 +83,7 @@ def main():
 	sim.add_event(avg_eps_e_saver)
 	sim.add_event(vtk_u_saver)
 	sim.add_event(vtk_stress_saver)
+	sim.add_event(time_counter)
 	sim.add_event(screen_monitor)
 
 	# Add controllers
