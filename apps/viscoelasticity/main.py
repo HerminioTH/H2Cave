@@ -18,7 +18,7 @@ def main():
 	time_list = np.linspace(0, 800*hour, 50)
 	settings = {
 		"Paths" : {
-			"Output": "output/case_1",
+			"Output": "output/case_0",
 			"Grid": "../../grids/quarter_cylinder_0",
 		},
 		"Time" : {
@@ -28,7 +28,7 @@ def main():
 			"theta": 0.5,
 		},
 		"Viscoelastic" : {
-			"E0": 2*GPa,
+			"E0": 3*GPa,
 			"nu0": 0.3,
 			"E1": 2*GPa,
 			"nu1": 0.3,

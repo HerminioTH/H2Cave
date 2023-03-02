@@ -109,10 +109,8 @@ class ViscoelasticElement(BaseElement):
 		stress_form = voigt2stress(dot(self.C0, strain2voigt(self.eps_e)))
 		self.stress.assign(local_projection(stress_form, self.TS))
 
-	def compute_elastic_strain(self, eps_v=None, eps_ie=None):
-		eps = self.eps_tot
-		if eps_v != None:
-			eps -= eps_v
+	def compute_elastic_strain(self, eps_ie=None):
+		eps = self.eps_tot - self.eps_v
 		if eps_ie != None:
 			eps -= eps_ie
 		self.eps_e.assign(local_projection(eps, self.TS))

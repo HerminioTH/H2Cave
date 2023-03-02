@@ -97,8 +97,9 @@ class ViscoelasticModel(MechanicsModel):
 		self.viscoelastic_element = ViscoelasticElement(self.fem_handler, self.settings)
 
 	def initialize(self, time_handler):
-		# Stiffness matrix
-		self.viscoelastic_element.build_A()
+		# # Stiffness matrix
+		# self.viscoelastic_element.build_A_elastic()
+		pass
 
 	def execute_iterative_procedure(self, time_handler):
 		pass
@@ -106,6 +107,9 @@ class ViscoelasticModel(MechanicsModel):
 	def execute_model_pre(self, time_handler):
 		# Compute constitutive matrices
 		self.viscoelastic_element.compute_constitutive_matrices(time_handler.time_step)
+
+		# Assemble stiffness matrix
+		self.viscoelastic_element.build_A()
 
 		# rhs vector
 		self.bc_handler.update_BCs(time_handler)
@@ -121,7 +125,7 @@ class ViscoelasticModel(MechanicsModel):
 		# Compute strains
 		self.viscoelastic_element.compute_total_strain(self.u)
 		self.viscoelastic_element.compute_viscoelastic_strain()
-		self.viscoelastic_element.compute_elastic_strain(eps_v=self.viscoelastic_element.eps_v)
+		self.viscoelastic_element.compute_elastic_strain()
 
 		# Compute stress
 		self.viscoelastic_element.compute_stress()
