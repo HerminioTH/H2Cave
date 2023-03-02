@@ -145,3 +145,35 @@ class TimeLevelCounter(Event):
 
 	def __compose_variable(self):
 		self.variable = str(self.counter) + "/" + str(self.total_steps)
+
+
+class TimeCounter(Event):
+	def __init__(self, time_handler, name="Time", unit="hours"):
+		self.name = f"{name} ({unit})"
+		if unit == "seconds":
+			self.unit = 1
+		elif unit == "minutes":
+			self.unit = 60
+		elif unit == "hours":
+			self.unit = 60*60
+		elif unit == "days":
+			self.unit = 24*60*60
+		else:
+			self.unit = 1
+			print(f"Unit {unit} is not valid. Choose between seconds, minutes, hours or days.")
+		self.time_handler = time_handler
+		self.__compose_variable()
+
+	def initialize(self):
+		pass
+
+	def execute(self):
+		self.__compose_variable()
+
+	def finalize(self):
+		pass
+
+	def __compose_variable(self):
+		self.variable = str(round(self.time_handler.time/self.unit, 2))
+		self.variable += "/"
+		self.variable += str(round(self.time_handler.final_time/self.unit, 2))
