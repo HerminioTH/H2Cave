@@ -91,7 +91,7 @@ def main():
 	fig, (ax1) = plt.subplots(1, 1, figsize=(5, 4))
 	fig.subplots_adjust(top=0.935, bottom=0.125, left=0.135, right=0.985, hspace=0.2, wspace=0.2)
 
-	folder = "case_1"
+	folder = "case_0"
 	# folder = "case_plain"
 	plot_num(ax1, folder)
 

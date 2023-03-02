@@ -71,4 +71,4 @@ class TimeController(Controller):
 		pass
 
 	def check(self):
-		return False
+		return None
