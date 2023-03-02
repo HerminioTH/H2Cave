@@ -4,7 +4,7 @@ import sys
 import numpy as np
 sys.path.append(os.path.join("..", "..", "libs"))
 from Grid import GridHandler
-from Events import VtkSaver, AverageSaver, ScreenOutput
+from Events import VtkSaver, AverageSaver, ScreenOutput, TimeLevelCounter, TimeCounter
 from Controllers import TimeController
 from Time import TimeHandler
 from FiniteElements import FemHandler
@@ -15,20 +15,20 @@ from Utils import *
 
 def main():
 	# Define settings
-	time_list = np.linspace(0, 800*hour, 50)
+	time_list = np.linspace(0, 200*hour, 50)
 	settings = {
 		"Paths" : {
-			"Output": "output/case_1",
+			"Output": "output/case_0",
 			"Grid": "../../grids/quarter_cylinder_0",
 		},
 		"Time" : {
 			"timeList": time_list,
 			"timeStep": 10*hour,
 			"finalTime": 800*hour,
-			"theta": 0.5,
+			"theta": 0.0,
 		},
 		"Viscoelastic" : {
-			"E0": 2*GPa,
+			"E0": 3*GPa,
 			"nu0": 0.3,
 			"E1": 2*GPa,
 			"nu1": 0.3,
@@ -54,7 +54,7 @@ def main():
 				"SIDE_Y": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
 				"OUTSIDE": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
 				"BOTTOM":	{"type": "DIRICHLET", 	"value": np.repeat(0.0, len(time_list))},
-				"TOP": 		{"type": "NEUMANN", 	"value": np.repeat(-12*MPa, len(time_list))}
+				"TOP": 		{"type": "NEUMANN", 	"value": np.repeat(-1*MPa, len(time_list))}
 				# "TOP": 		{"type": "NEUMANN", 	"value": np.linspace(-12*MPa, -15*MPa, len(time_list))}
 			}
 		}
@@ -81,7 +81,7 @@ def main():
 	model = ViscoelasticModel(fem_handler, bc_handler, settings)
 
 	# Controllers
-	time_controller = TimeController("Time", time_handler)
+	time_controller = TimeController("Time (s)", time_handler)
 
 	# Events
 	avg_eps_tot_saver = AverageSaver(fem_handler.dx(), "eps_tot", model.viscoelastic_element.eps_tot, time_handler, output_folder)
@@ -93,8 +93,12 @@ def main():
 	vtk_eps_e_saver = VtkSaver("eps_e", model.viscoelastic_element.eps_e, time_handler, output_folder)
 	vtk_eps_v_saver = VtkSaver("eps_v", model.viscoelastic_element.eps_v, time_handler, output_folder)
 
+	time_level_counter = TimeLevelCounter(time_handler)
+	time_counter = TimeCounter(time_handler, "Time (h)", "hours")
+
 	screen_monitor = ScreenOutput()
-	screen_monitor.add_controller(time_controller, width=20, align="center")
+	screen_monitor.add_controller(time_level_counter, width=10, align="center")
+	screen_monitor.add_controller(time_counter, width=20, align="center")
 
 	# Define simulator
 	sim = Simulator(time_handler)
@@ -110,6 +114,8 @@ def main():
 	sim.add_event(vtk_stress_saver)
 	sim.add_event(vtk_eps_e_saver)
 	sim.add_event(vtk_eps_v_saver)
+	sim.add_event(time_level_counter)
+	sim.add_event(time_counter)
 	sim.add_event(screen_monitor)
 
 	# Add controllers

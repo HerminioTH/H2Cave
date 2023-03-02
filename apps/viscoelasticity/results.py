@@ -94,9 +94,9 @@ def plot_num(ax1, file_name):
 
 def main():
 	fig, (ax1) = plt.subplots(1, 1, figsize=(5, 4))
-	fig.subplots_adjust(top=0.935, bottom=0.125, left=0.120, right=0.985, hspace=0.2, wspace=0.2)
+	fig.subplots_adjust(top=0.935, bottom=0.125, left=0.155, right=0.985, hspace=0.2, wspace=0.2)
 
-	folder = "case_1"
+	folder = "case_0"
 	plot_num(ax1, folder)
 
 	ax1.legend(loc=0, shadow=True, fancybox=True, ncol=1)
