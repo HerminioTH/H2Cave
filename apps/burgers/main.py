@@ -4,26 +4,27 @@ import numpy as np
 sys.path.append(os.path.join("..", "..", "libs"))
 from Grid import GridHandler
 from Events import VtkSaver, AverageSaver, ScreenOutput, TimeLevelCounter, TimeCounter
-from Controllers import TimeController
+from Controllers import TimeController, IterationController, ErrorController
 from Time import TimeHandler
 from FiniteElements import FemHandler
 from BoundaryConditions import MechanicsBoundaryConditions
 from Simulators import Simulator
-from Models import ViscoelasticModel
+from Models import BurgersModel
+from Elements import DashpotElement
 from Utils import *
 
-# ======= Standard Linear Solid model ======== #
-#  \|                      E1                  #
-#  \|               ___  /\  /\  __            #
-#  \|     E0,𝜈     |   \/  \/  \/  |           #
-#  \|__  /\  /\  __|               |———--🢂 σ  #
-#  \|  \/  \/  \/  |   _________   |           #
-#  \|              |_____|  η   |__|           #
-#  \|                    |      |              #
-#                      ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅                #
-#   |———— Ɛ_e —————|————— Ɛ_v —————|           #
-#   |——————————— Ɛ_tot ————————————|           #
-# ============================================ #
+# ===================== Burgers model ======================= #
+#  \|                      E1                                 #
+#  \|               ___  /\  /\  __                           #
+#  \|     E0,𝜈     |   \/  \/  \/  |   _________              #
+#  \|__  /\  /\  __|               |_____|      |———--🢂 σ    #
+#  \|  \/  \/  \/  |   _________   |     |  η2  |             #
+#  \|              |_____|      |__|   ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅               #
+#  \|                    |  η1  |                             #
+#                      ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅                               #
+#   |———— Ɛ_e —————|————— Ɛ_v —————|——— Ɛ_ie ———|             #
+#   |—————————————————— Ɛ_tot ——————————————————|             #
+# =========================================================== #
 
 def write_settings(settings):
 	# Define time levels
@@ -64,21 +65,20 @@ def main():
 	# Define boundary condition handler
 	bc_handler = MechanicsBoundaryConditions(fem_handler, settings)
 
-	# Define model
-	model = ViscoelasticModel(fem_handler, bc_handler, settings)
+	# Build Burgers model
+	model = BurgersModel(fem_handler, bc_handler, settings)
+	model.add_inelastic_element(DashpotElement(fem_handler, settings, element_name="Dashpot_1"))
 
 	# Controllers
-	time_controller = TimeController("Time (s)", time_handler)
+	iteration_controller = IterationController("Iterations", max_ite=10)
+	error_controller = ErrorController("Error", model, tol=1e-5)
 
 	# Events
 	avg_eps_tot_saver = AverageSaver(fem_handler.dx(), "eps_tot", model.viscoelastic_element.eps_tot, time_handler, output_folder)
-	avg_eps_e_saver = AverageSaver(fem_handler.dx(), "eps_e", model.viscoelastic_element.eps_e, time_handler, output_folder)
-	avg_eps_v_saver = AverageSaver(fem_handler.dx(), "eps_v", model.viscoelastic_element.eps_v, time_handler, output_folder)
 
 	vtk_u_saver = VtkSaver("displacement", model.u, time_handler, output_folder)
 	vtk_stress_saver = VtkSaver("stress", model.viscoelastic_element.stress, time_handler, output_folder)
-	vtk_eps_e_saver = VtkSaver("eps_e", model.viscoelastic_element.eps_e, time_handler, output_folder)
-	vtk_eps_v_saver = VtkSaver("eps_v", model.viscoelastic_element.eps_v, time_handler, output_folder)
+	vtk_eps_tot_saver = VtkSaver("eps_tot", model.viscoelastic_element.eps_tot, time_handler, output_folder)
 
 	time_level_counter = TimeLevelCounter(time_handler)
 	time_counter = TimeCounter(time_handler, "Time (h)", "hours")
@@ -86,6 +86,8 @@ def main():
 	screen_monitor = ScreenOutput()
 	screen_monitor.add_controller(time_level_counter, width=10, align="center")
 	screen_monitor.add_controller(time_counter, width=20, align="center")
+	screen_monitor.add_controller(iteration_controller, width=10, align="center")
+	screen_monitor.add_controller(error_controller, width=30, align="center")
 
 	# Define simulator
 	sim = Simulator(time_handler)
@@ -95,18 +97,16 @@ def main():
 
 	# Add events
 	sim.add_event(avg_eps_tot_saver)
-	sim.add_event(avg_eps_e_saver)
-	sim.add_event(avg_eps_v_saver)
 	sim.add_event(vtk_u_saver)
 	sim.add_event(vtk_stress_saver)
-	sim.add_event(vtk_eps_e_saver)
-	sim.add_event(vtk_eps_v_saver)
+	sim.add_event(vtk_eps_tot_saver)
 	sim.add_event(time_level_counter)
 	sim.add_event(time_counter)
 	sim.add_event(screen_monitor)
 
 	# Add controllers
-	sim.add_controller(time_controller)
+	sim.add_controller(iteration_controller)
+	sim.add_controller(error_controller)
 
 	# Run simulator
 	sim.run()

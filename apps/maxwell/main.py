@@ -1,4 +1,3 @@
-from fenics import *
 import os
 import sys
 import numpy as np
@@ -12,6 +11,17 @@ from BoundaryConditions import MechanicsBoundaryConditions
 from Simulators import Simulator
 from Models import MaxwellModel
 from Utils import *
+
+# =========== Maxwell's model =========== #
+#  \|                                     #
+#  \|     E0,𝜈     __________             #
+#  \|__  /\  /\  ___|        |———--🢂 σ   #
+#  \|  \/  \/  \/   |   η    |            #
+#  \|              ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅              #
+#   |———— Ɛ_e —————|—— Ɛ_v ——|            #
+#   |———————— Ɛ_tot —————————|            #
+# ======================================= #
+
 
 def write_settings(settings):
 	# Define time levels
@@ -41,8 +51,7 @@ def main():
 	grid_folder = os.path.join(*settings["Paths"]["Grid"].split("/"))
 
 	# Load grid
-	geometry_name = "geom"
-	grid = GridHandler(geometry_name, grid_folder)
+	grid = GridHandler("geom", grid_folder)
 
 	# Define time handler
 	time_handler = TimeHandler(settings["Time"])
