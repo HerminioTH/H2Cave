@@ -13,60 +13,35 @@ from Simulators import Simulator
 from Models import ViscoelasticModel
 from Utils import *
 
+def write_settings(settings):
+	# Define time levels
+	n_steps = 50
+	t_f = 800*hour
+	settings["Time"]["timeList"] = list(np.linspace(0, t_f, n_steps))
+
+	# Define boundary conditions
+	for u_i in settings["BoundaryConditions"].keys():
+		for boundary_name in settings["BoundaryConditions"][u_i]:
+			settings["BoundaryConditions"][u_i][boundary_name]["value"] = list(np.repeat(0.0, n_steps))
+
+	settings["BoundaryConditions"]["u_z"]["TOP"]["value"] = list(np.repeat(-12*MPa, n_steps))
+
+	# Dump to file
+	save_json(settings, "settings.json")
+
 def main():
-	# Define settings
-	time_list = np.linspace(0, 200*hour, 50)
-	settings = {
-		"Paths" : {
-			"Output": "output/case_0",
-			"Grid": "../../grids/quarter_cylinder_0",
-		},
-		"Time" : {
-			"timeList": time_list,
-			"timeStep": 10*hour,
-			"finalTime": 800*hour,
-			"theta": 0.0,
-		},
-		"Viscoelastic" : {
-			"E0": 3*GPa,
-			"nu0": 0.3,
-			"E1": 2*GPa,
-			"nu1": 0.3,
-			"eta": 5e14
-		},
-		"BoundaryConditions" : {
-			"u_x" : {
-				"SIDE_X": 	{"type": "DIRICHLET", 	"value": np.repeat(0.0, len(time_list))},
-				"SIDE_Y": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"OUTSIDE": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"BOTTOM":	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"TOP": 		{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))}
-			},
-			"u_y" : {
-				"SIDE_X": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"SIDE_Y": 	{"type": "DIRICHLET", 	"value": np.repeat(0.0, len(time_list))},
-				"OUTSIDE": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"BOTTOM":	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"TOP": 		{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))}
-			},
-			"u_z" : {
-				"SIDE_X": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"SIDE_Y": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"OUTSIDE": 	{"type": "NEUMANN", 	"value": np.repeat(0.0, len(time_list))},
-				"BOTTOM":	{"type": "DIRICHLET", 	"value": np.repeat(0.0, len(time_list))},
-				"TOP": 		{"type": "NEUMANN", 	"value": np.repeat(-1*MPa, len(time_list))}
-				# "TOP": 		{"type": "NEUMANN", 	"value": np.linspace(-12*MPa, -15*MPa, len(time_list))}
-			}
-		}
-	}
+	# Read settings
+	settings = read_json("settings.json")
+
+	# Write settings
+	write_settings(settings)
 
 	# Define folders
 	output_folder = os.path.join(*settings["Paths"]["Output"].split("/"))
 	grid_folder = os.path.join(*settings["Paths"]["Grid"].split("/"))
 
 	# Load grid
-	geometry_name = "geom"
-	grid = GridHandler(geometry_name, grid_folder)
+	grid = GridHandler("geom", grid_folder)
 
 	# Define time handler
 	time_handler = TimeHandler(settings["Time"])
