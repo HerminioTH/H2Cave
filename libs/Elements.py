@@ -180,14 +180,13 @@ class DashpotElement(BaseElement):
 		self.element_name = element_name
 		self.theta = settings["Time"]["theta"]
 		self.__load_props(settings)
-		self.__initialize_constitutive_matrices()
 		self.__initialize_tensors()
 
 	def build_A(self):
 		pass
 
-	def build_b(self):
-		b_form = inner(sigma(self.C0, self.eps_ie), epsilon(self.v))*self.dx
+	def build_b(self, C):
+		b_form = inner(sigma(C, self.eps_ie), epsilon(self.v))*self.dx
 		self.b = assemble(b_form)
 
 	def update(self):
@@ -202,17 +201,10 @@ class DashpotElement(BaseElement):
 		self.eps_ie_rate.assign(local_projection((1/self.eta)*stress, self.TS))
 
 	def __load_props(self, settings):
-		self.E0 = Constant(settings["Elastic"]["E"])
-		self.nu0 = Constant(settings["Elastic"]["nu"])
 		self.eta = Constant(settings[self.element_name]["eta"])
-
-	def __initialize_constitutive_matrices(self):
-		C0_sy = constitutive_matrix_sy(self.E0, self.nu0)
-		self.C0 = as_matrix(Constant(np.array(C0_sy).astype(np.float64)))
 
 	def __initialize_tensors(self,):
 		zero_tensor = Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","0.0")), degree=0)
-		self.eps_e = local_projection(zero_tensor, self.TS)
 		self.eps_ie = local_projection(zero_tensor, self.TS)
 		self.eps_ie_old = local_projection(zero_tensor, self.TS)
 		self.eps_ie_rate = local_projection(zero_tensor, self.TS)

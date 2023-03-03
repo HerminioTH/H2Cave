@@ -181,7 +181,7 @@ class MaxwellModel(MechanicsModel):
 
 	def execute_iterative_procedure(self, time_handler):
 		# rhs vector
-		self.dashpot_element.build_b()
+		self.dashpot_element.build_b(self.elastic_element.C0)
 		b = self.bc_handler.b + self.dashpot_element.b
 
 		# Solve linear system
