@@ -111,9 +111,6 @@ class ViscoelasticModel(MechanicsModel):
 		# # Update fields
 		# self.viscoelastic_element.update()
 
-	def execute_iterative_procedure(self, time_handler):
-		pass
-
 	def execute_model_pre(self, time_handler):
 		# Compute constitutive matrices
 		self.viscoelastic_element.compute_constitutive_matrices(time_handler.time_step)
@@ -123,8 +120,14 @@ class ViscoelasticModel(MechanicsModel):
 
 		# rhs vector
 		self.bc_handler.update_BCs(time_handler)
+
+	def execute_iterative_procedure(self, time_handler):
+		# rhs vector
 		self.viscoelastic_element.build_b()
 		b = self.bc_handler.b + self.viscoelastic_element.b
+
+		# for ie_element in self.inelastic_elements:
+		# 	ie_element.
 
 		# Apply boundary conditions
 		[bc.apply(self.viscoelastic_element.A, b) for bc in self.bc_handler.bcs]
@@ -209,11 +212,10 @@ class MaxwellModel(MechanicsModel):
 class BurgersModel(MechanicsModel):
 	def __init__(self, fem_handler, bc_handler, settings):
 		super().__init__(fem_handler, bc_handler, settings)
-		self.viscoelastic_element = ViscoelasticElement(self.fem_handler, self.settings)
+		self.viscoelastic_element = ViscoelasticElement(self.fem_handler, self.settings, element_name="Viscoelastic")
 		self.inelastic_elements = []
 
-	def add_inelastic_element(self, element_name):
-		self.settings[self.element_name]["E"]
+	def add_inelastic_element(self, inelastic_element):
 		self.inelastic_elements.append(inelastic_element)
 
 	def initialize(self, time_handler):
