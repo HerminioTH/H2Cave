@@ -134,7 +134,6 @@ def main():
 			[bc.apply(A, b) for bc in bc_handler.bcs]
 			solve(A, u.vector(), b, "cg", "ilu")
 
-
 			u_new = u.vector()
 			u_old = u_k.vector()
 
