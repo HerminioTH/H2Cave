@@ -68,12 +68,6 @@ def apply_white_theme(fig, axes, transparent=True):
 			ax.xaxis.label.set_color('black')
 			ax.set_facecolor("#e9e9e9ff")
 
-def plot_exp(ax, axins=None):
-	data = np.loadtxt(os.path.join("exp", "sigmaA_12_14_15MPa_sigmaR_0MPa.csv"), delimiter=",")
-	ax.plot(data[:,0], data[:,1], ".", color="black", label="Exp.", ms=10, mfc="white")
-	if axins != None:
-		axins.plot(data[:,0], data[:,1], ".", color="black", label="Exp.", ms=10, mfc="white")
-
 def plot_num(ax1, file_name):
 	output_folder = os.path.join("output", f"{file_name}", "avg")
 	eps_tot = pd.read_excel(os.path.join(output_folder, "eps_tot.xlsx"))
@@ -82,14 +76,11 @@ def plot_num(ax1, file_name):
 	# eps_ve["22"] += eps_e["22"]
 
 	step = 1
-	ax1.plot(eps_tot["Time"][::step]/hour, 100*abs(eps_tot["22"][::step]), ".-", color="0.15", label=r"$\varepsilon_{tot}$", ms=8, mfc="steelblue")
-	ax1.plot(eps_ve["Time"][::step]/hour, 100*abs(eps_ve["22"][::step]), ".-", color="0.15", label=r"$\varepsilon_{v}$", ms=8, mfc="lightcoral")
-	ax1.plot(eps_e["Time"][::step]/hour, 100*abs(eps_e["22"][::step]), ".-", color="0.15", label=r"$\varepsilon_{e}$", ms=8, mfc="gold")
+	ax1.plot(eps_tot["Time"][::step]/hour, 100*eps_tot["22"][::step], ".-", color="0.15", label=r"$\varepsilon_{axial}$", ms=8, mfc="steelblue")
+	ax1.plot(eps_tot["Time"][::step]/hour, 100*eps_tot["00"][::step], ".-", color="0.15", label=r"$\varepsilon_{radial}$", ms=8, mfc="lightcoral")
 	ax1.set_xlabel("Time [hour]", size=12, fontname="serif")
 	ax1.set_ylabel("Axial Strain [%]", size=12, fontname="serif")
 	ax1.grid(True)
-
-
 
 
 def main():
