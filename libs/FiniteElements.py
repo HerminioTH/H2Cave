@@ -1,4 +1,4 @@
-from fenics import Measure, VectorFunctionSpace, TensorFunctionSpace, TrialFunction, TestFunction, dot, FacetNormal
+from fenics import Measure, VectorFunctionSpace, TensorFunctionSpace, FunctionSpace, TrialFunction, TestFunction, dot, FacetNormal
 
 class FemHandler():
 	def __init__(self, grid):
@@ -6,7 +6,8 @@ class FemHandler():
 		self.dx_ = Measure("dx", domain=self.grid.mesh, subdomain_data=self.grid.subdomains)
 		self.ds_ = Measure("ds", domain=self.grid.mesh, subdomain_data=self.grid.boundaries)
 		self.V = VectorFunctionSpace(self.grid.mesh, "CG", 1)
-		self.TS = TensorFunctionSpace(self.grid.mesh, "DG", 0)
+		self.TS = TensorFunctionSpace(self.grid.mesh, "DG", 0)#, symmetry=True)
+		self.P0 = FunctionSpace(self.grid.mesh, "DG", 0)
 		self.du = TrialFunction(self.V)
 		self.v = TestFunction(self.V)
 		self.n = dot(self.v, FacetNormal(self.grid.mesh))

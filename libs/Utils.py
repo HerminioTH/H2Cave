@@ -26,8 +26,8 @@ def strain2voigt(e):
 
 def voigt2stress(s):
     return fe.as_matrix([[s[0], s[3], s[4]],
-		    		  [s[3], s[1], s[5]],
-		    		  [s[4], s[5], s[2]]])
+		    		     [s[3], s[1], s[5]],
+		    		     [s[4], s[5], s[2]]])
 
 def epsilon(u):
 	# return 0.5*(nabla_grad(u) + nabla_grad(u).T)
@@ -60,3 +60,5 @@ def constitutive_matrix_sy(E, nu):
 							0.,			0.,				0.,				0.,		0.,		x*G])
 	return M
 
+
+ppos = lambda x: (x+abs(x))/2.

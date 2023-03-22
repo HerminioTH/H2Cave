@@ -11,6 +11,7 @@ class BaseElement(metaclass=abc.ABCMeta):
 		self.v = fem_handler.v
 		self.dx = fem_handler.dx()
 		self.TS = fem_handler.TS
+		self.P0 = fem_handler.P0
 		self.initialize_tensors()
 
 	def initialize_tensors(self):
@@ -300,3 +301,130 @@ class PressureSolutionCreep(BaseElement):
 		self.eps_ie_rate = local_projection(zero_tensor, self.TS)
 		self.eps_ie_rate_old = local_projection(zero_tensor, self.TS)
 		
+
+
+class ViscoplasticElement(BaseElement):
+	def __init__(self, fem_handler, settings, element_name="Viscoplastic"):
+		super().__init__(fem_handler)
+		self.element_name = element_name
+		self.theta = settings["Time"]["theta"]
+		self.__load_props(settings)
+		self.__initialize_fields()
+
+	def build_A(self):
+		pass
+
+	def build_b(self, C):
+		b_form = inner(sigma(C, self.eps_ie), epsilon(self.v))*self.dx
+		self.b = assemble(b_form)
+
+	def update(self):
+		self.eps_ie_old.assign(self.eps_ie)
+		self.eps_ie_rate_old.assign(self.eps_ie_rate)
+
+	def compute_viscous_strain(self, stress, dt):
+		self.__compute_viscous_strain_rate(stress)
+		self.eps_ie.assign(local_projection(self.eps_ie_old + dt*(self.theta*self.eps_ie_rate_old + (1 - self.theta)*self.eps_ie_rate), self.TS))
+
+	def __compute_viscous_strain_rate(self, stress):
+		self.alpha.assign(local_projection(self.alpha, self.P0))
+
+		self.compute_invariants(stress)
+		self.compute_yield_surface()
+
+	def compute_invariants(self, stress):
+		stress_MPa = stress/MPa
+		i1 = stress_MPa[0,0] + stress_MPa[1,1] + stress_MPa[2,2]
+		self.I1.assign(local_projection(i1, self.P0))
+
+		i2 = (stress_MPa[0,0]*stress_MPa[1,1] + stress_MPa[0,0]*stress_MPa[2,2] + stress_MPa[2,2]*stress_MPa[1,1]
+		   - stress_MPa[0,1]**2 - stress_MPa[0,2]**2 - stress_MPa[1,2]**2)
+		self.I2.assign(local_projection(i2, self.P0))
+
+		i3 = (stress_MPa[0,0]*stress_MPa[1,1]*stress_MPa[2,2] + 2*stress_MPa[0,1]*stress_MPa[0,2]*stress_MPa[1,2]
+		   - stress_MPa[0,0]*stress_MPa[1,2]**2 - stress_MPa[1,1]*stress_MPa[0,2]**2 - stress_MPa[2,2]*stress_MPa[0,1]**2)
+		self.I3.assign(local_projection(i3, self.P0))
+
+		j2 = (1/3)*i1**2 - i2
+		self.J2.assign(local_projection(j2, self.P0))
+
+		j3 = (2/27)*i1**3 - (1/3)*i1*i2 + i3
+		self.J3.assign(local_projection(j3, self.P0))
+
+		print("S_xx:", np.average(stress.vector()[0::9]/MPa))
+		print("S_yy:", np.average(stress.vector()[4::9]/MPa))
+		print("S_zz:", np.average(stress.vector()[8::9]/MPa))
+		# print("S_xx:", np.average(stress.vector()[:]))
+		# print("S_xx:", stress_MPa.vector())
+		# print("S_xx:", np.average(stress_MPa))
+
+	# def compute_F(self, )
+
+	def compute_yield_surface(self):
+		I1_star = self.I1 + self.sigma_t
+		Sr = -self.J3*np.sqrt(27)/2/(self.J2**(3/2))
+		F1 = (self.gamma*I1_star**2 - self.alpha*I1_star**self.n)
+		F2 = (exp(self.beta_1*I1_star) - self.beta*Sr)**self.m_v
+		F = self.J2 - F1*F2
+		# self.F_vp.assign(local_projection(ppos(-F), self.P0))
+		self.F_vp.assign(local_projection(F, self.P0))
+		# self.F_vp.vector()[:] = 2*self.F_vp.vector()[:]
+
+		print("n:", float(self.n))
+		print("gamma:", float(self.gamma))
+		print("beta_1:", float(self.beta_1))
+		print("beta:", float(self.beta))
+		print("m_v:", float(self.m_v))
+		print("alpha:", np.average(self.alpha.vector()[:]))
+		print("I1:", np.average(self.I1.vector()[:]))
+		print("I2:", np.average(self.I2.vector()[:]))
+		print("I3:", np.average(self.I3.vector()[:]))
+		print("J1:", np.average(self.J1.vector()[:]))
+		print("J2:", np.average(self.J2.vector()[:]))
+		print("J3:", np.average(self.J3.vector()[:]))
+		print("Fvp:", np.average(self.F_vp.vector()[:]))
+		# print(self.F_vp.vector()[-2:])
+		# print(self.alpha.vector()[:].shape)
+		# print(self.F_vp.vector()[:].shape)
+		# print(self.eps_ie_rate.vector()[:].shape)
+		print()
+
+		# s = stress - (1./3)*tr(stress)*Identity(3)
+		# self.eps_ie_rate.assign(local_projection(self.mu_1*s, self.TS))
+		# pass
+
+	def __load_props(self, settings):
+		self.F_0 = Constant(settings[self.element_name]["F_0"])
+		self.mu_1 = Constant(settings[self.element_name]["mu_1"])
+		self.N_1 = Constant(settings[self.element_name]["N_1"])
+		self.n = Constant(settings[self.element_name]["n"])
+		self.a_1 = Constant(settings[self.element_name]["a_1"])
+		self.eta_1 = Constant(settings[self.element_name]["eta_1"])
+		self.beta_1 = Constant(settings[self.element_name]["beta_1"])
+		self.beta = Constant(settings[self.element_name]["beta"])
+		self.m_v = Constant(settings[self.element_name]["m_v"])
+		self.gamma = Constant(settings[self.element_name]["gamma"])
+		self.alpha_0 = Constant(settings[self.element_name]["alpha_0"])
+		self.k_v = Constant(settings[self.element_name]["k_v"])
+		self.sigma_t = Constant(settings[self.element_name]["sigma_t"])
+
+	def __initialize_fields(self,):
+		zero_tensor = Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","0.0")), degree=0)
+		self.eps_ie = local_projection(zero_tensor, self.TS)
+		self.eps_ie_old = local_projection(zero_tensor, self.TS)
+		self.eps_ie_rate = local_projection(zero_tensor, self.TS)
+		self.eps_ie_rate_old = local_projection(zero_tensor, self.TS)
+
+		# self.alpha_field = Function(self.P0)
+		# self.alpha_field.assign(self.alpha)
+		
+		zero_scalar = Expression("A", A=self.alpha_0, degree=0)
+		self.alpha = local_projection(zero_scalar, self.P0)
+
+		self.I1 = local_projection(Expression("0.0", degree=0), self.P0)
+		self.I2 = local_projection(Expression("0.0", degree=0), self.P0)
+		self.I3 = local_projection(Expression("0.0", degree=0), self.P0)
+		self.J1 = local_projection(Expression("0.0", degree=0), self.P0)
+		self.J2 = local_projection(Expression("0.0", degree=0), self.P0)
+		self.J3 = local_projection(Expression("0.0", degree=0), self.P0)
+		self.F_vp = local_projection(Expression("0.0", degree=0), self.P0)
