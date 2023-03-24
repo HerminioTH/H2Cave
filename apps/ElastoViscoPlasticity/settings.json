@@ -18,14 +18,15 @@
         "beta": -0.995,
         "m_v": -0.5,
         "gamma": 0.985,
-        "alpha_0": 0.072,
-        "k_v": 0.085,
-        "sigma_t": 0.0
+        "alpha_0": 0.007,
+        "k_v": 0.0,
+        "sigma_t": 5.4
     },
     "Time": {
         "timeList": [
             0.0,
-            288000.0
+            36000.0,
+            72000.0
         ],
         "timeStep": 10,
         "finalTime": 800,
@@ -37,6 +38,7 @@
                 "type": "DIRICHLET",
                 "value": [
                     0.0,
+                    0.0,
                     0.0
                 ]
             },
@@ -44,19 +46,22 @@
                 "type": "NEUMANN",
                 "value": [
                     0.0,
+                    0.0,
                     0.0
                 ]
             },
             "OUTSIDE": {
                 "type": "NEUMANN",
                 "value": [
-                    -10000000.0,
-                    -10000000.0
+                    0.0,
+                    0.0,
+                    0.0
                 ]
             },
             "BOTTOM": {
                 "type": "NEUMANN",
                 "value": [
+                    0.0,
                     0.0,
                     0.0
                 ]
@@ -64,6 +69,7 @@
             "TOP": {
                 "type": "NEUMANN",
                 "value": [
+                    0.0,
                     0.0,
                     0.0
                 ]
@@ -74,12 +80,14 @@
                 "type": "NEUMANN",
                 "value": [
                     0.0,
+                    0.0,
                     0.0
                 ]
             },
             "SIDE_Y": {
                 "type": "DIRICHLET",
                 "value": [
+                    0.0,
                     0.0,
                     0.0
                 ]
@@ -88,6 +96,7 @@
                 "type": "NEUMANN",
                 "value": [
                     0.0,
+                    0.0,
                     0.0
                 ]
             },
@@ -95,12 +104,14 @@
                 "type": "NEUMANN",
                 "value": [
                     0.0,
+                    0.0,
                     0.0
                 ]
             },
             "TOP": {
                 "type": "NEUMANN",
                 "value": [
+                    0.0,
                     0.0,
                     0.0
                 ]
@@ -111,12 +122,14 @@
                 "type": "NEUMANN",
                 "value": [
                     0.0,
+                    0.0,
                     0.0
                 ]
             },
             "SIDE_Y": {
                 "type": "NEUMANN",
                 "value": [
+                    0.0,
                     0.0,
                     0.0
                 ]
@@ -125,6 +138,7 @@
                 "type": "NEUMANN",
                 "value": [
                     0.0,
+                    0.0,
                     0.0
                 ]
             },
@@ -132,14 +146,16 @@
                 "type": "DIRICHLET",
                 "value": [
                     0.0,
+                    0.0,
                     0.0
                 ]
             },
             "TOP": {
                 "type": "NEUMANN",
                 "value": [
-                    -18000000.0,
-                    -18000000.0
+                    35000000.0,
+                    35000000.0,
+                    35000000.0
                 ]
             }
         }

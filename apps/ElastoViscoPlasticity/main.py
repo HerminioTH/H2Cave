@@ -28,8 +28,8 @@ from Utils import *
 
 def write_settings(settings):
 	# Define time levels
-	n_steps = 2
-	t_f = 80*hour
+	n_steps = 3
+	t_f = 20*hour
 	settings["Time"]["timeList"] = list(np.linspace(0, t_f, n_steps))
 
 	# Define boundary conditions
@@ -37,8 +37,8 @@ def write_settings(settings):
 		for boundary_name in settings["BoundaryConditions"][u_i]:
 			settings["BoundaryConditions"][u_i][boundary_name]["value"] = list(np.repeat(0.0, n_steps))
 
-	settings["BoundaryConditions"]["u_z"]["TOP"]["value"] = list(np.repeat(-18*MPa, n_steps))
-	settings["BoundaryConditions"]["u_x"]["OUTSIDE"]["value"] = list(np.repeat(-10*MPa, n_steps))
+	settings["BoundaryConditions"]["u_z"]["TOP"]["value"] = list(np.repeat(35*MPa, n_steps))
+	settings["BoundaryConditions"]["u_x"]["OUTSIDE"]["value"] = list(np.repeat(0*MPa, n_steps))
 
 	# Dump to file
 	save_json(settings, "settings.json")

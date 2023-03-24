@@ -1,6 +1,7 @@
 import fenics as fe
 import sympy as sy
 import json
+import numpy as np
 
 sec = 1.
 minute = 60*sec
@@ -60,5 +61,9 @@ def constitutive_matrix_sy(E, nu):
 							0.,			0.,				0.,				0.,		0.,		x*G])
 	return M
 
+def double_dot(A, B):
+	# Performs the operation A:B, which returns a scalar. 
+	# A and B are second order tensors (2d numpy arrays)
+	return np.tensordot(A, B.T, axes=2)
 
 ppos = lambda x: (x+abs(x))/2.

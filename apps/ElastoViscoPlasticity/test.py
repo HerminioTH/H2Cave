@@ -67,6 +67,10 @@ def main_2():
     sigmas_zz = np.array(bcs["u_z"]["TOP"]["value"])/MPa
     sigmas_xy = sigmas_xz = sigmas_yz = np.array([0.0 for i in range(len(sigmas_zz))])
 
+    # sigmas_xx = -sigmas_xx
+    # sigmas_yy = -sigmas_yy
+    # sigmas_zz = -sigmas_zz
+
     # Compute stress invariants
     I1 = sigmas_xx + sigmas_yy + sigmas_zz
     I2 = sigmas_xx*sigmas_yy + sigmas_yy*sigmas_zz + sigmas_xx*sigmas_zz - sigmas_xy**2 - sigmas_yz**2 - sigmas_xz**2
@@ -97,8 +101,40 @@ def main_2():
     Fvp = J2 - F1*F2
     print("Fvp: ", Fvp)
 
+    # Sr = -(J3*np.sqrt(27))/(2*J2**1.5)
+    # F1 = (-self.alpha*I1_star**self.n + self.gamma*I1_star**2)
+    # F2 = (np.exp(self.beta_1*I1_star) - self.beta*Sr)**self.m
+    # self.Fvp = J2 - F1*F2
+
+
+def main_3():
+
+    A = np.random.rand(3, 3)
+    B = np.random.rand(3, 3)
+
+    def double_dot_1(A, B):
+        return np.tensordot(A, B.T, axes=2)
+
+    def double_dot_2(A, B):
+        n, m = A.shape
+        value = 0.0
+        for i in range(n):
+            for j in range(m):
+                value += A[i,j]*B[j,i]
+        return value
+
+    print(A)
+    print(B)
+    print(double_dot_1(A,B))
+    print(double_dot_2(A,B))
+
+    C = 2*np.eye(3)
+    print()
+    print(double_dot_1(C,C))
+    print(C[0,0])
     
 
 if __name__ == "__main__":
     # main()
-    main_2()
+    # main_2()
+    main_3()
