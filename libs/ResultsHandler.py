@@ -79,6 +79,33 @@ class TensorSaver():
 		self.df.to_excel(os.path.join(output_folder, f"{self.name}.xlsx"))
 		# df.to_csv(os.path.join(output_folder, f"{self.name}.csv"))
 
+class ScalarSaver():
+	def __init__(self, name, dx):
+		import fenics as fe
+		self.fe = fe
+		self.name = name
+		self.dx = dx
+		self.vol = fe.assemble(1*self.dx)
+		self.scalar_data = {
+			"Time": [],
+			"Scalar": []
+		}
+
+	def get_average(self, scalar):
+		return self.fe.assemble(scalar*self.dx)/self.vol
+
+	def record_average(self, scalar, t):
+		self.scalar_data["Time"].append(t)
+		avg_value = self.get_average(scalar)
+		self.scalar_data["Scalar"].append(avg_value)
+
+	def save(self, output_folder):
+		if not os.path.exists(output_folder):
+			os.makedirs(output_folder)
+		self.df = pd.DataFrame(self.scalar_data)
+		self.df.to_excel(os.path.join(output_folder, f"{self.name}.xlsx"))
+		# df.to_csv(os.path.join(output_folder, f"{self.name}.csv"))
+
 class ResultsHandler(object):
 	def __init__(self, output_folder, vtu_file_name):
 		self.output_folder = output_folder

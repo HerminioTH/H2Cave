@@ -302,7 +302,6 @@ class ElastoViscoplasticModel(MechanicsModel):
 
 		# Solve linear system
 		self.__solve_linear_system(self.elastic_element.A, b)
-		# print(np.linalg.norm(self.u.vector()), np.linalg.norm(self.u_k.vector()))
 
 		# Compute total strain
 		self.elastic_element.compute_total_strain(self.u)
@@ -322,3 +321,4 @@ class ElastoViscoplasticModel(MechanicsModel):
 	def __solve_linear_system(self, A, b):
 		[bc.apply(A, b) for bc in self.bc_handler.bcs]
 		solve(A, self.u.vector(), b, "cg", "ilu")
+

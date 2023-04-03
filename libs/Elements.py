@@ -61,7 +61,8 @@ class ElasticElement(BaseElement):
 		eps = self.eps_tot
 		if eps_ie != None:
 			eps -= eps_ie
-		self.eps_e.assign(local_projection(eps, self.TS))
+		self.eps_e = eps
+		# self.eps_e.assign(local_projection(eps, self.TS))
 
 	def __initialize_tensors(self):
 		zero_tensor = Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","0.0")), degree=0)
@@ -325,14 +326,13 @@ class ViscoplasticElement(BaseElement):
 
 	def compute_viscous_strain(self, stress, dt):
 		self.__compute_viscous_strain_rate(stress, dt)
-		self.eps_ie.assign(local_projection(self.eps_ie_old + dt*(self.theta*self.eps_ie_rate_old + (1 - self.theta)*self.eps_ie_rate), self.TS))
+		self.eps_ie = self.eps_ie_old + dt*(self.theta*self.eps_ie_rate_old + (1 - self.theta)*self.eps_ie_rate)
+		# self.eps_ie.assign(local_projection(self.eps_ie_old + dt*(self.theta*self.eps_ie_rate_old + (1 - self.theta)*self.eps_ie_rate), self.TS))
 
 	def __compute_viscous_strain_rate(self, stress, dt):
 		self.compute_invariants(stress)
 		self.compute_yield_surface()
 		n_elems = self.alpha_q.vector()[:].size
-
-		print(dt)
 
 		# Extract arrays from element fields (DG)
 		strain_rates_array = np.zeros((n_elems, 3, 3))
@@ -347,20 +347,20 @@ class ViscoplasticElement(BaseElement):
 
 			# Get element values
 			stress_elem = self.__get_tensor_at_element(stress, e)
+			alpha_q_elem = self.__get_scalar_at_element(self.alpha_q, e)
 			alpha_elem = self.__get_scalar_at_element(self.alpha, e)
 			Fvp_elem = self.compute_Fvp_at_element(stress_elem, alpha_elem)
-			alpha_q_elem = self.__get_scalar_at_element(self.alpha_q, e)
 			qsi_elem = qsi_array[e]
 			qsi_v_elem = qsi_v_array[e]
 
-			print('Fvp_elem:', Fvp_elem)
+			# print('Fvp_elem:', Fvp_elem)
 
 			if Fvp_elem <= 0.0:
 				strain_rates_array[e] = np.zeros((3,3))
 			else:
 				tol = 1e-6
 				error = 2*tol
-				maxiter = 10
+				maxiter = 20
 				ite = 1
 
 				alpha_last = alpha_elem
@@ -392,6 +392,8 @@ class ViscoplasticElement(BaseElement):
 
 					# Compute error
 					error = abs(alpha_elem - alpha_last)
+					# if e == 0:
+					# 	print(f"(alpha: {alpha_elem}) (alpha_last: {alpha_last}) (Error: {error}) (Fvp: {Fvp_elem})")
 					alpha_last = alpha_elem
 
 					# Compute yield function
@@ -399,17 +401,25 @@ class ViscoplasticElement(BaseElement):
 
 					# Iteration control
 					ite += 1
-					if ite >= maxiter:
-						print(f"Element {e}: Maximum number of iterations ({maxiter}) reached.")
+					# if ite >= maxiter:
+					# 	print(f"Element {e}: Maximum number of iterations ({maxiter}) reached.")
 
 				# Assign strain rate to element e
 				strain_rates_array[e] = strain_rate
+				# print(ite)
+
+			if e == 0:
+				print(f"(alpha: {alpha_elem}) (alpha_last: {alpha_last}) (Error: {error}) (Ite: {ite}) (Fvp: {Fvp_elem})")
 
 			Fvp_array[e] = Fvp_elem
 			alpha_array[e] = alpha_elem
 			alpha_q_array[e] = alpha_q_elem
 			qsi_array[e] = qsi_elem
 			qsi_v_array[e] = qsi_v_elem
+
+
+		# print()
+		# print(Fvp_array[0])
 
 		self.F_vp.vector()[:] = Fvp_array
 		self.alpha.vector()[:] = alpha_array
@@ -420,11 +430,6 @@ class ViscoplasticElement(BaseElement):
 
 
 
-	def __compute_viscous_strain_rate_2(self, stress):
-		self.compute_invariants(stress)
-		self.compute_yield_surface()
-		self.compute_flow_direction(stress)
-
 	def __get_tensor_at_element(self, tensor_field, elem):
 		ids = [9*elem+0, 9*elem+4, 9*elem+8, 9*elem+1, 9*elem+2, 9*elem+5]
 		return tensor_field.vector()[ids]
@@ -432,58 +437,13 @@ class ViscoplasticElement(BaseElement):
 	def __get_scalar_at_element(self, scalar_field, elem):
 		return scalar_field.vector()[elem]
 
-	# def compute_flow_direction(self, stress):
-	# 	n_elems = self.alpha_q.vector()[:].size
-	# 	flow_array = np.zeros((n_elems, 3, 3))
-	# 	for e in range(n_elems):
-	# 		stress_elem = self.__get_tensor_at_element(stress, e)
-	# 		alpha_q_elem = self.__get_scalar_at_element(self.alpha_q, e)
-	# 		input_variables = np.append(stress_elem/MPa, alpha_q_elem)
-	# 		dqdsxx = self.dFdSxx(*input_variables)
-	# 		dqdsyy = self.dFdSyy(*input_variables)
-	# 		dqdszz = self.dFdSzz(*input_variables)
-	# 		dqdsxy = self.dFdSxy(*input_variables)
-	# 		dqdsxz = self.dFdSxz(*input_variables)
-	# 		dqdsyz = self.dFdSyz(*input_variables)
-	# 		flow_array[e] = np.array([[dqdsxx, dqdsxy, dqdsxz],
-	# 								  [dqdsxy, dqdsyy, dqdsyz],
-	# 								  [dqdsxz, dqdsyz, dqdszz]])
-	# 	self.dQdS.vector()[:] = flow_array.flatten()
-	# 	# print(self.dQdS.vector()[:9].reshape((3,3)))
-
-	def compute_yield_surface_at_element(self, stress, alpha):
-		pass
-
 	def compute_yield_surface(self):
 		I1_star = self.I1 + self.sigma_t
 		Sr = -self.J3*np.sqrt(27)/2/(self.J2**(3/2))
 		F1 = (self.gamma*I1_star**2 - self.alpha*I1_star**self.n)
 		F2 = (exp(self.beta_1*I1_star) - self.beta*Sr)**self.m_v
 		F = self.J2 - F1*F2
-		# self.F_vp.assign(local_projection(ppos(-F), self.P0))
-		# self.F_vp.assign(local_projection(ppos(F), self.P0))
 		self.F_vp.assign(local_projection(F, self.P0))
-		# self.F_vp.vector()[:] = 2*self.F_vp.vector()[:]
-
-		# print("n:", float(self.n))
-		# print("gamma:", float(self.gamma))
-		# print("beta_1:", float(self.beta_1))
-		# print("beta:", float(self.beta))
-		# print("m_v:", float(self.m_v))
-		# print("alpha:", np.average(self.alpha.vector()[:]))
-		# print("I1:", np.average(self.I1.vector()[:]))
-		# print("I2:", np.average(self.I2.vector()[:]))
-		# print("I3:", np.average(self.I3.vector()[:]))
-		# print("J1:", np.average(self.J1.vector()[:]))
-		# print("J2:", np.average(self.J2.vector()[:]))
-		# print("J3:", np.average(self.J3.vector()[:]))
-		# print("Fvp:", np.average(self.F_vp.vector()[:]))
-		# print()
-
-		# s = stress - (1./3)*tr(stress)*Identity(3)
-		# self.eps_ie_rate.assign(local_projection(self.mu_1*s, self.TS))
-		# pass
-
 
 	def compute_invariants(self, stress):
 		stress_MPa = stress/MPa
@@ -504,30 +464,7 @@ class ViscoplasticElement(BaseElement):
 		j3 = (2/27)*i1**3 - (1/3)*i1*i2 + i3
 		self.J3.assign(local_projection(j3, self.P0))
 
-		# print("S_xx:", np.average(stress.vector()[0::9]/MPa))
-		# print("S_yy:", np.average(stress.vector()[4::9]/MPa))
-		# print("S_zz:", np.average(stress.vector()[8::9]/MPa))
-		# print("S_xx:", np.average(stress.vector()[:]))
-		# print("S_xx:", stress_MPa.vector())
-		# print("S_xx:", np.average(stress_MPa))
-
-	# def compute_F(self, )
-
 	def __load_props(self, settings):
-		# self.F_0 = Constant(settings[self.element_name]["F_0"])
-		# self.mu_1 = Constant(settings[self.element_name]["mu_1"])
-		# self.N_1 = Constant(settings[self.element_name]["N_1"])
-		# self.n = Constant(settings[self.element_name]["n"])
-		# self.a_1 = Constant(settings[self.element_name]["a_1"])
-		# self.eta_1 = Constant(settings[self.element_name]["eta_1"])
-		# self.beta_1 = Constant(settings[self.element_name]["beta_1"])
-		# self.beta = Constant(settings[self.element_name]["beta"])
-		# self.m_v = Constant(settings[self.element_name]["m_v"])
-		# self.gamma = Constant(settings[self.element_name]["gamma"])
-		# self.alpha_0 = Constant(settings[self.element_name]["alpha_0"])
-		# self.k_v = Constant(settings[self.element_name]["k_v"])
-		# self.sigma_t = Constant(settings[self.element_name]["sigma_t"])
-
 		self.F_0 = settings[self.element_name]["F_0"]
 		self.mu_1 = settings[self.element_name]["mu_1"]
 		self.N_1 = settings[self.element_name]["N_1"]

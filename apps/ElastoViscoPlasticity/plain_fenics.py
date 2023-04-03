@@ -69,7 +69,7 @@ def main():
 	# zero_tensor = Expression((("x[0]*x[0]","x[0]*x[1]","x[0]*x[2]"), ("x[1]*x[0]","x[1]*x[1]","x[1]*x[2]"), ("x[2]*x[0]","x[2]*x[1]","x[2]*x[2]")), degree=0)
 	# stress = local_projection(Expression((("11","12","13"), ("21","22","23"), ("31","32","33")), degree=0), TS)
 	# stress_field = local_projection(Expression((("1000.0","0.0","0.0"), ("0.0","1000.0","0.0"), ("0.0","0.0","5000.0")), degree=0), TS)
-	stress_field = local_projection(Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","s_z")), s_z=35*MPa, degree=0), TS)
+	stress_field = local_projection(Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","s_z")), s_z=32*MPa, degree=0), TS)
 	flow_field = local_projection(Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","0.0")), degree=0), TS)
 	alpha_q_field = local_projection(Expression("alpha_q", alpha_q=alpha_q, degree=0), P0)
 	alpha_field = local_projection(Expression("alpha", alpha=alpha, degree=0), P0)

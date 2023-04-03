@@ -108,6 +108,25 @@ class AverageSaver(Event):
 		self.saver.save(os.path.join(self.output_folder, "avg"))
 
 
+class AverageScalerSaver(Event):
+	def __init__(self, dx, field_name, field, time_handler, output_folder):
+		from ResultsHandler import ScalarSaver
+		self.saver = ScalarSaver(field_name, dx)
+		self.field = field
+		self.time_handler = time_handler
+		self.output_folder = output_folder
+
+	def initialize(self):
+		pass
+
+	def execute(self):
+		self.saver.record_average(self.field, self.time_handler.time)
+
+	def finalize(self):
+		self.saver.save(os.path.join(self.output_folder, "avg"))
+
+
+
 class VtkSaver(Event):
 	def __init__(self, field_name, field, time_handler, output_folder):
 		from fenics import File
