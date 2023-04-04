@@ -28,8 +28,8 @@ from Utils import *
 
 def write_settings(settings):
 	# Define time levels
-	n_steps = 30
-	t_f = 16*hour
+	n_steps = 100
+	t_f = 100*hour
 	settings["Time"]["timeList"] = list(np.linspace(0, t_f, n_steps))
 
 	print(settings["Time"]["timeList"][-1] - settings["Time"]["timeList"][-2])

@@ -61,8 +61,7 @@ class ElasticElement(BaseElement):
 		eps = self.eps_tot
 		if eps_ie != None:
 			eps -= eps_ie
-		self.eps_e = eps
-		# self.eps_e.assign(local_projection(eps, self.TS))
+		self.eps_e.assign(local_projection(eps, self.TS))
 
 	def __initialize_tensors(self):
 		zero_tensor = Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","0.0")), degree=0)
@@ -323,11 +322,11 @@ class ViscoplasticElement(BaseElement):
 	def update(self):
 		self.eps_ie_old.assign(self.eps_ie)
 		self.eps_ie_rate_old.assign(self.eps_ie_rate)
+		self.update_hardening_parameters()
 
 	def compute_viscous_strain(self, stress, dt):
 		self.__compute_viscous_strain_rate(stress, dt)
-		self.eps_ie = self.eps_ie_old + dt*(self.theta*self.eps_ie_rate_old + (1 - self.theta)*self.eps_ie_rate)
-		# self.eps_ie.assign(local_projection(self.eps_ie_old + dt*(self.theta*self.eps_ie_rate_old + (1 - self.theta)*self.eps_ie_rate), self.TS))
+		self.eps_ie.assign(local_projection(self.eps_ie_old + dt*(self.theta*self.eps_ie_rate_old + (1 - self.theta)*self.eps_ie_rate), self.TS))
 
 	def __compute_viscous_strain_rate(self, stress, dt):
 		self.compute_invariants(stress)
@@ -408,27 +407,24 @@ class ViscoplasticElement(BaseElement):
 				strain_rates_array[e] = strain_rate
 				# print(ite)
 
-			if e == 0:
-				print(f"(alpha: {alpha_elem}) (alpha_last: {alpha_last}) (Error: {error}) (Ite: {ite}) (Fvp: {Fvp_elem})")
+			# if e == 0:
+			# 	print(f"(alpha: {alpha_elem}) (alpha_last: {alpha_last}) (Error: {error}) (Ite: {ite}) (Fvp: {Fvp_elem})")
 
-			Fvp_array[e] = Fvp_elem
-			alpha_array[e] = alpha_elem
-			alpha_q_array[e] = alpha_q_elem
-			qsi_array[e] = qsi_elem
-			qsi_v_array[e] = qsi_v_elem
+			self.Fvp_array[e] = Fvp_elem
+			self.alpha_array[e] = alpha_elem
+			self.alpha_q_array[e] = alpha_q_elem
+			self.qsi_array[e] = qsi_elem
+			self.qsi_v_array[e] = qsi_v_elem
 
-
-		# print()
-		# print(Fvp_array[0])
-
-		self.F_vp.vector()[:] = Fvp_array
-		self.alpha.vector()[:] = alpha_array
-		self.alpha_q.vector()[:] = alpha_q_array
-		self.qsi.vector()[:] = qsi_array
-		self.qsi_v.vector()[:] = qsi_v_array
 		self.eps_ie_rate.vector()[:] = strain_rates_array.flatten()
 
 
+	def update_hardening_parameters(self):
+		self.F_vp.vector()[:] = self.Fvp_array
+		self.alpha.vector()[:] = self.alpha_array
+		self.alpha_q.vector()[:] = self.alpha_q_array
+		self.qsi.vector()[:] = self.qsi_array
+		self.qsi_v.vector()[:] = self.qsi_v_array
 
 	def __get_tensor_at_element(self, tensor_field, elem):
 		ids = [9*elem+0, 9*elem+4, 9*elem+8, 9*elem+1, 9*elem+2, 9*elem+5]
@@ -505,6 +501,15 @@ class ViscoplasticElement(BaseElement):
 		self.J2 = local_projection(Expression("0.0", degree=0), self.P0)
 		self.J3 = local_projection(Expression("0.0", degree=0), self.P0)
 		self.F_vp = local_projection(Expression("0.0", degree=0), self.P0)
+
+		# Get number of elements
+		n_elems = len(self.F_vp.vector()[:])
+
+		self.Fvp_array = np.zeros(n_elems)
+		self.alpha_array = np.zeros(n_elems)
+		self.alpha_q_array = np.zeros(n_elems)
+		self.qsi_array = np.zeros(n_elems)
+		self.qsi_v_array = np.zeros(n_elems)
 
 	def __initialize_yield_and_potential_functions(self):
 		# Define a sympy function

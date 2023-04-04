@@ -317,6 +317,7 @@ class ElastoViscoplasticModel(MechanicsModel):
 
 	def execute_model_post(self, time_handler):
 		self.viscoplastic_element.update()
+		# self.viscoelastic_element.update_hardening_parameters()
 
 	def __solve_linear_system(self, A, b):
 		[bc.apply(A, b) for bc in self.bc_handler.bcs]
