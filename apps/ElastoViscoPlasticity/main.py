@@ -12,7 +12,7 @@ from Simulators import Simulator
 from Models import ElastoViscoplasticModel
 from Utils import *
 
-# ================ Burgers model ================== #
+# ========== Elasto-visco-plastic model =========== #
 #  \|                     ____                      #
 #  \|               ___  | σY |____                 #
 #  \|     E0,𝜈     |   \ +————+    |                #
