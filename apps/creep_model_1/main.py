@@ -22,7 +22,7 @@ from Utils import *
 #  \|              |_____|      |__|   ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅     ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅               #
 #  \|                    |  η1  |                                          #
 #                      ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅                                            #
-#   |———— Ɛ_e —————|————— Ɛ_v —————|——— Ɛ_d ————|——— Ɛ_p ————|             #
+#   |——— Ɛ_e ————|—————— Ɛ_v ——————|——— Ɛ_d ————|——— Ɛ_p ————|             #
 #   |————————————————————————— Ɛ_tot ————————————————————————|             #
 #                                                                          #
 #   Ɛ_e   - elastic strain                                                 #
@@ -35,7 +35,7 @@ from Utils import *
 def write_settings(settings):
 	# Define time levels
 	n_steps = 50
-	t_f = 800*hour
+	t_f = 80*hour
 	settings["Time"]["timeList"] = list(np.linspace(0, t_f, n_steps))
 
 	# Define boundary conditions
@@ -43,7 +43,7 @@ def write_settings(settings):
 		for boundary_name in settings["BoundaryConditions"][u_i]:
 			settings["BoundaryConditions"][u_i][boundary_name]["value"] = list(np.repeat(0.0, n_steps))
 
-	settings["BoundaryConditions"]["u_z"]["TOP"]["value"] = list(np.repeat(-16*MPa, n_steps))
+	settings["BoundaryConditions"]["u_z"]["TOP"]["value"] = list(np.repeat(16*MPa, n_steps))
 
 	# Dump to file
 	save_json(settings, "settings.json")
@@ -77,15 +77,18 @@ def main():
 	model.add_inelastic_element(PressureSolutionCreep(fem_handler, settings, element_name="PressureSolutionCreep"))
 
 	# Controllers
-	iteration_controller = IterationController("Iterations", max_ite=10)
-	error_controller = ErrorController("Error", model, tol=1e-5)
+	iteration_controller = IterationController("Iterations", max_ite=20)
+	error_controller = ErrorController("Error", model, tol=1e-8)
 
 	# Events
 	avg_eps_tot_saver = AverageSaver(fem_handler.dx(), "eps_tot", model.viscoelastic_element.eps_tot, time_handler, output_folder)
+	avg_eps_e_saver = AverageSaver(fem_handler.dx(), "eps_e", model.viscoelastic_element.eps_e, time_handler, output_folder)
+	avg_eps_ve_saver = AverageSaver(fem_handler.dx(), "eps_ve", model.viscoelastic_element.eps_v, time_handler, output_folder)
+	avg_eps_d_saver = AverageSaver(fem_handler.dx(), "eps_d", model.inelastic_elements[0].eps_ie, time_handler, output_folder)
+	avg_eps_p_saver = AverageSaver(fem_handler.dx(), "eps_p", model.inelastic_elements[1].eps_ie, time_handler, output_folder)
+	avg_stress_saver = AverageSaver(fem_handler.dx(), "stress", model.viscoelastic_element.stress, time_handler, output_folder)
 
 	vtk_u_saver = VtkSaver("displacement", model.u, time_handler, output_folder)
-	vtk_stress_saver = VtkSaver("stress", model.viscoelastic_element.stress, time_handler, output_folder)
-	vtk_eps_tot_saver = VtkSaver("eps_tot", model.viscoelastic_element.eps_tot, time_handler, output_folder)
 
 	time_level_counter = TimeLevelCounter(time_handler)
 	time_counter = TimeCounter(time_handler, "Time (h)", "hours")
@@ -104,9 +107,12 @@ def main():
 
 	# Add events
 	sim.add_event(avg_eps_tot_saver)
+	sim.add_event(avg_eps_e_saver)
+	sim.add_event(avg_eps_ve_saver)
+	sim.add_event(avg_eps_d_saver)
+	sim.add_event(avg_eps_p_saver)
+	sim.add_event(avg_stress_saver)
 	sim.add_event(vtk_u_saver)
-	sim.add_event(vtk_stress_saver)
-	sim.add_event(vtk_eps_tot_saver)
 	sim.add_event(time_level_counter)
 	sim.add_event(time_counter)
 	sim.add_event(screen_monitor)
