@@ -323,3 +323,99 @@ class ElastoViscoplasticModel(MechanicsModel):
 		[bc.apply(A, b) for bc in self.bc_handler.bcs]
 		solve(A, self.u.vector(), b, "cg", "ilu")
 
+
+
+
+class GeneralModel(MechanicsModel):
+	def __init__(self, fem_handler, bc_handler, settings):
+		super().__init__(fem_handler, bc_handler, settings)
+		self.elastic_element = ElasticElement(self.fem_handler, self.settings, element_name="Elastic")
+		self.inelastic_elements = []
+
+	def add_inelastic_element(self, inelastic_element):
+		self.inelastic_elements.append(inelastic_element)
+
+	def initialize(self, time_handler):
+		# Stiffness matrix
+		self.elastic_element.build_A()
+
+	def execute_model_pre(self, time_handler):
+		# Update boundary condition
+		self.bc_handler.update_BCs(time_handler)
+
+	def execute_iterative_procedure(self, time_handler):
+		# Get inelastic strains from dashpots
+		eps_ie = self.__get_eps_ie()
+		eps_ie_old = self.__get_eps_ie_old()
+
+		# rhs vector
+		b = self.__build_rhs()
+		# self.inelastic_elements[0].build_b(self.elastic_element.C0)
+		# b = self.bc_handler.b + self.inelastic_elements[0].b
+		# b = 0
+		# b += self.bc_handler.b
+		# for ie_element in self.inelastic_elements:
+		# 	ie_element.build_b(self.elastic_element.C0)
+		# 	b += ie_element.b
+		# print(type(b))
+		# # b += self.bc_handler.b
+
+		# Solve linear system
+		self.__solve_linear_system(self.elastic_element.A, b)
+
+		# Compute total strain
+		self.elastic_element.compute_total_strain(self.u)
+
+		# Compute elastic strain
+		self.elastic_element.compute_elastic_strain(eps_ie=eps_ie)
+
+		# Compute stress
+		self.elastic_element.compute_stress()
+
+		# Update inelastic strains
+		self.__compute_eps_ie(self.elastic_element.stress, time_handler)
+
+	def execute_model_post(self, time_handler):
+		for ie_element in self.inelastic_elements:
+			ie_element.update()
+
+	def __solve_linear_system(self, A, b):
+		[bc.apply(A, b) for bc in self.bc_handler.bcs]
+		# solve(A, self.u.vector(), b, "petsc")
+		solve(A, self.u.vector(), b, "cg", "ilu")
+
+
+	def __build_rhs(self):
+		b = 0
+		b += self.bc_handler.b
+		for ie_element in self.inelastic_elements:
+			ie_element.build_b(self.elastic_element.C0)
+			b += ie_element.b
+		return b
+
+	def __get_eps_ie_old(self):
+		eps_ie_old = 0
+		for ie_element in self.inelastic_elements:
+			eps_ie_old += ie_element.eps_ie_old
+		if eps_ie_old == 0:
+			return None
+		else:
+			# return local_projection(eps_ie_old, self.elastic_element.TS)
+			return eps_ie_old
+
+	def __get_eps_ie(self):
+		eps_ie = 0
+		for ie_element in self.inelastic_elements:
+			eps_ie += ie_element.eps_ie
+		if eps_ie == 0:
+			return None
+		else:
+			# return local_projection(eps_ie, self.elastic_element.TS)
+			return eps_ie
+
+	def __compute_eps_ie(self, stress, time_handler):
+		for ie_element in self.inelastic_elements:
+			ie_element.compute_viscous_strain(stress, time_handler.time_step)
+
+
+
