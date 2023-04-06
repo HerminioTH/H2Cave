@@ -34,8 +34,8 @@ from Utils import *
 
 def write_settings(settings):
 	# Define time levels
-	n_steps = 50
-	t_f = 80*hour
+	n_steps = 25
+	t_f = 40*hour
 	settings["Time"]["timeList"] = list(np.linspace(0, t_f, n_steps))
 
 	# Define boundary conditions
@@ -53,7 +53,7 @@ def main():
 	settings = read_json("settings.json")
 
 	# Write settings
-	# write_settings(settings)
+	write_settings(settings)
 
 	# Define folders
 	output_folder = os.path.join(*settings["Paths"]["Output"].split("/"))

@@ -205,7 +205,42 @@ class BurgersModel(MechanicsModel):
 		self.inelastic_elements.append(inelastic_element)
 
 	def initialize(self, time_handler):
-		pass
+		# # Elastic stiffness matrix
+		self.viscoelastic_element.build_A_elastic()
+
+		# rhs vector due to boundary conditions
+		self.bc_handler.update_BCs(time_handler)
+		b = self.bc_handler.b
+
+		# Apply boundary conditions
+		[bc.apply(self.viscoelastic_element.A_elastic, b) for bc in self.bc_handler.bcs]
+
+		# Solve instantaneous elastic problem
+		solve(self.viscoelastic_element.A_elastic, self.u.vector(), b, "cg", "ilu")
+
+		# Get inelastic strains from dashpots
+		eps_ie = self.__get_eps_ie()
+		eps_ie_old = self.__get_eps_ie_old()
+
+		# Compute constitutive matrices
+		self.viscoelastic_element.compute_constitutive_matrices(time_handler.time_step)
+
+		# Compute strains
+		self.viscoelastic_element.compute_total_strain(self.u)
+		# self.viscoelastic_element.compute_viscoelastic_strain(eps_ie=eps_ie, eps_ie_old=eps_ie_old)
+		# self.viscoelastic_element.compute_elastic_strain(eps_ie=eps_ie)
+
+		# Compute stress
+		# self.viscoelastic_element.compute_stress()
+
+		# # Update inelastic strains
+		# self.__compute_eps_ie(self.viscoelastic_element.stress, time_handler)
+
+		# Update total strain
+		self.viscoelastic_element.update()
+		# self.__update_eps_ie()
+		# pass
+
 
 	def execute_model_pre(self, time_handler):
 		# Compute constitutive matrices
@@ -213,7 +248,6 @@ class BurgersModel(MechanicsModel):
 
 		# Stiffness matrix
 		self.viscoelastic_element.build_A()
-		A = self.viscoelastic_element.A
 
 		# rhs vector due to boundary conditions
 		self.bc_handler.update_BCs(time_handler)
@@ -225,11 +259,14 @@ class BurgersModel(MechanicsModel):
 
 		# rhs vector
 		self.viscoelastic_element.build_b(eps_ie=eps_ie, eps_ie_old=eps_ie_old)
-		b = self.bc_handler.b + self.viscoelastic_element.b
+		# b = self.bc_handler.b + self.viscoelastic_element.b
+		b = self.viscoelastic_element.b
 
 		for ie_element in self.inelastic_elements:
 			ie_element.build_b(self.viscoelastic_element.C0)
 			b += ie_element.b
+
+		b += self.bc_handler.b
 
 		# Apply boundary conditions
 		[bc.apply(self.viscoelastic_element.A, b) for bc in self.bc_handler.bcs]
@@ -244,6 +281,7 @@ class BurgersModel(MechanicsModel):
 
 		# Compute stress
 		self.viscoelastic_element.compute_stress()
+		# self.viscoelastic_element.compute_stress(eps_ie=eps_ie, eps_ie_old=eps_ie_old)
 
 		# Update inelastic strains
 		self.__compute_eps_ie(self.viscoelastic_element.stress, time_handler)
@@ -350,15 +388,6 @@ class GeneralModel(MechanicsModel):
 
 		# rhs vector
 		b = self.__build_rhs()
-		# self.inelastic_elements[0].build_b(self.elastic_element.C0)
-		# b = self.bc_handler.b + self.inelastic_elements[0].b
-		# b = 0
-		# b += self.bc_handler.b
-		# for ie_element in self.inelastic_elements:
-		# 	ie_element.build_b(self.elastic_element.C0)
-		# 	b += ie_element.b
-		# print(type(b))
-		# # b += self.bc_handler.b
 
 		# Solve linear system
 		self.__solve_linear_system(self.elastic_element.A, b)
@@ -381,7 +410,6 @@ class GeneralModel(MechanicsModel):
 
 	def __solve_linear_system(self, A, b):
 		[bc.apply(A, b) for bc in self.bc_handler.bcs]
-		# solve(A, self.u.vector(), b, "petsc")
 		solve(A, self.u.vector(), b, "cg", "ilu")
 
 
@@ -400,7 +428,6 @@ class GeneralModel(MechanicsModel):
 		if eps_ie_old == 0:
 			return None
 		else:
-			# return local_projection(eps_ie_old, self.elastic_element.TS)
 			return eps_ie_old
 
 	def __get_eps_ie(self):
@@ -410,7 +437,6 @@ class GeneralModel(MechanicsModel):
 		if eps_ie == 0:
 			return None
 		else:
-			# return local_projection(eps_ie, self.elastic_element.TS)
 			return eps_ie
 
 	def __compute_eps_ie(self, stress, time_handler):
