@@ -3,39 +3,40 @@ import sys
 import numpy as np
 sys.path.append(os.path.join("..", "..", "libs"))
 from Grid import GridHandler
-from Events import VtkSaver, AverageSaver, ScreenOutput, TimeLevelCounter, TimeCounter
+from Events import VtkSaver, AverageSaver, AverageScalerSaver, ScreenOutput, TimeLevelCounter, TimeCounter
 from Controllers import TimeController, IterationController, ErrorController
 from Time import TimeHandler
 from FiniteElements import FemHandler
 from BoundaryConditions import MechanicsBoundaryConditions
 from Simulators import Simulator
 from Models import BurgersModel
-from Elements import DislocationCreep, PressureSolutionCreep
+from Elements import ViscoplasticElement, DislocationCreep, PressureSolutionCreep
 from Utils import *
 
-# =========================== Creep model - 1 ============================ #
-#  \|                      E1                                              #
-#  \|               ___  /\  /\  __                                        #
-#  \|     E0,𝜈     |   \/  \/  \/  |   _________    _________              #
-#  \|__  /\  /\  __|               |_____|      |_____|      |———--🢂 σ    #
-#  \|  \/  \/  \/  |   _________   |     |  η2  |     |  η3  |             #
-#  \|              |_____|      |__|   ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅     ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅               #
-#  \|                    |  η1  |                                          #
-#                      ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅                                            #
-#   |——— Ɛ_e ————|—————— Ɛ_v ——————|——— Ɛ_d ————|——— Ɛ_p ————|             #
-#   |————————————————————————— Ɛ_tot ————————————————————————|             #
-#                                                                          #
-#   Ɛ_e   - elastic strain                                                 #
-#   Ɛ_v   - viscoelastic strain                                            #
-#   Ɛ_d   - dislocation creep strain                                       #
-#   Ɛ_p   - pressure solution creep strain                                 #
-#   Ɛ_tot - total strain                                                   #
-# ======================================================================== #
+# ==================================== Creep model - 2 ====================================== #
+#  \|                      E1                ____                                             #
+#  \|               ___  /\  /\  __    ___  | σY |____                                        #
+#  \|     E0,𝜈     |   \/  \/  \/  |  |   \ +————+    |   _________    _________              #
+#  \|__  /\  /\  __|               |__|    ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅    |_____|      |_____|      |———--🢂 σ    #
+#  \|  \/  \/  \/  |   _________   |  |   _________   |     |  η3  |     |  η4  |             #
+#  \|              |_____|      |__|  |_____|      |__|   ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅     ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅               #
+#  \|                    |  η1  |           |  η2  |                                          #
+#                      ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅           ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅                                            #
+#   |——— Ɛ_e ————|—————— Ɛ_v ——————|—————— Ɛ_vp ——————|——— Ɛ_d ————|——— Ɛ_p ————|             #
+#   |—————————————————————————————————— Ɛ_tot ——————————————————————————————————|             #
+#                                                                                             #
+#   Ɛ_e   - elastic strain                                                                    #
+#   Ɛ_v   - viscoelastic strain                                                               #
+#   Ɛ_vp  - viscoplastic strain                                                               #
+#   Ɛ_d   - dislocation creep strain                                                          #
+#   Ɛ_p   - pressure solution creep strain                                                    #
+#   Ɛ_tot - total strain                                                                      #
+# =========================================================================================== #
 
 def write_settings(settings):
 	# Define time levels
-	n_steps = 25
-	t_f = 40*hour
+	n_steps = 120
+	t_f = 300*hour
 	settings["Time"]["timeList"] = list(np.linspace(0, t_f, n_steps))
 
 	# Define boundary conditions
@@ -50,7 +51,7 @@ def write_settings(settings):
 
 def main():
 	# Read settings
-	settings = read_json("settings.json")
+	settings = read_json("settings.json") 
 
 	# Write settings
 	write_settings(settings)
@@ -73,20 +74,24 @@ def main():
 
 	# Build Burgers model
 	model = BurgersModel(fem_handler, bc_handler, settings)
+	model.add_inelastic_element(ViscoplasticElement(fem_handler, settings, element_name="Viscoplastic"))
 	model.add_inelastic_element(DislocationCreep(fem_handler, settings, element_name="DislocationCreep"))
 	model.add_inelastic_element(PressureSolutionCreep(fem_handler, settings, element_name="PressureSolutionCreep"))
 
 	# Controllers
 	iteration_controller = IterationController("Iterations", max_ite=20)
-	error_controller = ErrorController("Error", model, tol=1e-8)
+	error_controller = ErrorController("Error", model, tol=1e-5)
 
 	# Events
 	avg_eps_tot_saver = AverageSaver(fem_handler.dx(), "eps_tot", model.viscoelastic_element.eps_tot, time_handler, output_folder)
 	avg_eps_e_saver = AverageSaver(fem_handler.dx(), "eps_e", model.viscoelastic_element.eps_e, time_handler, output_folder)
 	avg_eps_ve_saver = AverageSaver(fem_handler.dx(), "eps_ve", model.viscoelastic_element.eps_v, time_handler, output_folder)
-	avg_eps_d_saver = AverageSaver(fem_handler.dx(), "eps_d", model.inelastic_elements[0].eps_ie, time_handler, output_folder)
-	avg_eps_p_saver = AverageSaver(fem_handler.dx(), "eps_p", model.inelastic_elements[1].eps_ie, time_handler, output_folder)
-	avg_stress_saver = AverageSaver(fem_handler.dx(), "stress", model.viscoelastic_element.stress, time_handler, output_folder)
+	avg_eps_vp_saver = AverageSaver(fem_handler.dx(), "eps_vp", model.inelastic_elements[0].eps_ie, time_handler, output_folder)
+	avg_eps_d_saver = AverageSaver(fem_handler.dx(), "eps_d", model.inelastic_elements[1].eps_ie, time_handler, output_folder)
+	avg_eps_p_saver = AverageSaver(fem_handler.dx(), "eps_p", model.inelastic_elements[2].eps_ie, time_handler, output_folder)
+
+	avg_alpha_saver = AverageScalerSaver(fem_handler.dx(), "alpha", model.inelastic_elements[0].alpha, time_handler, output_folder)
+	avg_Fvp_saver = AverageScalerSaver(fem_handler.dx(), "Fvp", model.inelastic_elements[0].F_vp, time_handler, output_folder)
 
 	vtk_u_saver = VtkSaver("displacement", model.u, time_handler, output_folder)
 
@@ -109,9 +114,11 @@ def main():
 	sim.add_event(avg_eps_tot_saver)
 	sim.add_event(avg_eps_e_saver)
 	sim.add_event(avg_eps_ve_saver)
+	sim.add_event(avg_eps_vp_saver)
 	sim.add_event(avg_eps_d_saver)
 	sim.add_event(avg_eps_p_saver)
-	sim.add_event(avg_stress_saver)
+	sim.add_event(avg_alpha_saver)
+	sim.add_event(avg_Fvp_saver)
 	sim.add_event(vtk_u_saver)
 	sim.add_event(time_level_counter)
 	sim.add_event(time_counter)

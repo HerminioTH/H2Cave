@@ -110,6 +110,25 @@ class ViscoelasticElement(BaseElement):
 		stress_form = voigt2stress(dot(self.C0, strain2voigt(self.eps_e)))
 		self.stress.assign(local_projection(stress_form, self.TS))
 
+	# def compute_stress(self, eps_ie=None, eps_ie_old=None):
+	# 	# Elastic part
+	# 	stress_form = voigt2stress(dot(self.C0, strain2voigt(self.eps_tot)))
+
+	# 	# Viscoelastic part
+	# 	stress_form += -voigt2stress(dot(self.C4, strain2voigt(self.eps_v_old)))
+	# 	eps_theta = self.theta*self.eps_tot_old + (1 - self.theta)*self.eps_tot
+	# 	if eps_ie != None:
+	# 		eps_ie_theta = self.theta*eps_ie_old + (1 - self.theta)*eps_ie
+	# 		eps_theta -= eps_ie_theta
+	# 	stress_form += -voigt2stress(dot(self.C5, strain2voigt(eps_theta)))
+
+	# 	# Inelastic part
+	# 	if eps_ie != None:
+	# 		stress_form += -voigt2stress(dot(self.C0, strain2voigt(eps_ie)))
+
+	# 	# Compute stress
+	# 	self.stress.assign(local_projection(stress_form, self.TS))
+
 	def compute_elastic_strain(self, eps_ie=None):
 		eps = self.eps_tot - self.eps_v
 		if eps_ie != None:
@@ -172,6 +191,51 @@ class ViscoelasticElement(BaseElement):
 	def __multiply(self, a, C):
 		x = sy.Symbol("x")
 		return (x*C).subs(x, a)
+
+
+class KelvinElement(BaseElement):
+	def __init__(self, fem_handler, settings, element_name="KelvinElement"):
+		super().__init__(fem_handler)
+		self.element_name = element_name
+		self.theta = settings["Time"]["theta"]
+		self.__load_props(settings)
+		self.__initialize_constitutive_matrices()
+		self.__initialize_tensors()
+
+	def build_A(self):
+		pass
+
+	def build_b(self, C):
+		b_form = inner(sigma(C, self.eps_ie), epsilon(self.v))*self.dx
+		self.b = assemble(b_form)
+
+	def update(self):
+		self.eps_ie_old.assign(self.eps_ie)
+		self.eps_ie_rate_old.assign(self.eps_ie_rate)
+
+	def compute_viscous_strain(self, stress, dt):
+		self.__compute_viscous_strain_rate(stress)
+		self.eps_ie.assign(local_projection(self.eps_ie_old + dt*(self.theta*self.eps_ie_rate_old + (1 - self.theta)*self.eps_ie_rate), self.TS))
+
+	def __compute_viscous_strain_rate(self, stress):
+		sigma_v = stress - sigma(self.C, self.eps_ie)
+		self.eps_ie_rate.assign(local_projection(sigma_v/self.eta, self.TS))
+
+	def __load_props(self, settings):
+		self.eta = Constant(settings[self.element_name]["eta"])
+		self.E = Constant(settings[self.element_name]["E"])
+		self.nu = Constant(settings[self.element_name]["nu"])
+
+	def __initialize_constitutive_matrices(self):
+		self.C_sy = constitutive_matrix_sy(self.E, self.nu)
+		self.C = as_matrix(Constant(np.array(self.C_sy).astype(np.float64)))
+
+	def __initialize_tensors(self,):
+		zero_tensor = Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","0.0")), degree=0)
+		self.eps_ie = local_projection(zero_tensor, self.TS)
+		self.eps_ie_old = local_projection(zero_tensor, self.TS)
+		self.eps_ie_rate = local_projection(zero_tensor, self.TS)
+		self.eps_ie_rate_old = local_projection(zero_tensor, self.TS)
 
 
 
@@ -324,6 +388,13 @@ class ViscoplasticElement(BaseElement):
 		self.eps_ie_rate_old.assign(self.eps_ie_rate)
 		self.update_hardening_parameters()
 
+	def update_hardening_parameters(self):
+		self.F_vp.vector()[:] = self.Fvp_array
+		self.alpha.vector()[:] = self.alpha_array
+		self.alpha_q.vector()[:] = self.alpha_q_array
+		self.qsi.vector()[:] = self.qsi_array
+		self.qsi_v.vector()[:] = self.qsi_v_array
+
 	def compute_viscous_strain(self, stress, dt):
 		self.__compute_viscous_strain_rate(stress, dt)
 		self.eps_ie.assign(local_projection(self.eps_ie_old + dt*(self.theta*self.eps_ie_rate_old + (1 - self.theta)*self.eps_ie_rate), self.TS))
@@ -417,14 +488,6 @@ class ViscoplasticElement(BaseElement):
 			self.qsi_v_array[e] = qsi_v_elem
 
 		self.eps_ie_rate.vector()[:] = strain_rates_array.flatten()
-
-
-	def update_hardening_parameters(self):
-		self.F_vp.vector()[:] = self.Fvp_array
-		self.alpha.vector()[:] = self.alpha_array
-		self.alpha_q.vector()[:] = self.alpha_q_array
-		self.qsi.vector()[:] = self.qsi_array
-		self.qsi_v.vector()[:] = self.qsi_v_array
 
 	def __get_tensor_at_element(self, tensor_field, elem):
 		ids = [9*elem+0, 9*elem+4, 9*elem+8, 9*elem+1, 9*elem+2, 9*elem+5]
@@ -544,7 +607,6 @@ class ViscoplasticElement(BaseElement):
 		self.dQdSxy = sy.lambdify(variables, sy.diff(Qvp, s_xy), "numpy")
 		self.dQdSxz = sy.lambdify(variables, sy.diff(Qvp, s_xz), "numpy")
 		self.dQdSyz = sy.lambdify(variables, sy.diff(Qvp, s_yz), "numpy")
-
 
 	def compute_Fvp_at_element(self, stress, alpha):
 		stress_MPa = stress/MPa
