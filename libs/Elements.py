@@ -451,7 +451,8 @@ class ViscoplasticElement(BaseElement):
 					qsi_elem = qsi_old + increment
 
 					# Compute qsi_v
-					increment_v = (strain_rate[0,0]**2 + strain_rate[1,1]**2 + strain_rate[2,2]**2)**0.5*dt
+					# increment_v = (strain_rate[0,0]**2 + strain_rate[1,1]**2 + strain_rate[2,2]**2)**0.5*dt
+					increment_v = (strain_rate[0,0] + strain_rate[1,1] + strain_rate[2,2])*dt
 					qsi_v_elem = qsi_v_old + increment_v
 
 					# Update alpha
@@ -592,15 +593,19 @@ class ViscoplasticElement(BaseElement):
 		J3 = (2/27)*I1**3 - (1/3)*I1*I2 + I3
 		Sr = -(J3*np.sqrt(27))/(2*J2**1.5)
 
-		I_star = I1 + self.sigma_t
-		Q1 = (-a_q*I_star**self.n + self.gamma*I_star**2)
-		Q2 = (sy.exp(self.beta_1*I_star) - self.beta*Sr)**self.m_v
+		Q1 = (-a_q*I1**self.n + self.gamma*I1**2)
+		Q2 = (sy.exp(self.beta_1*I1) - self.beta*Sr)**self.m_v
 		Qvp = J2 - Q1*Q2
 
-		# print(sy.diff(Qvp, s_xx))
+		I_star = I1 + self.sigma_t
+		F1 = (-a_q*I_star**self.n + self.gamma*I_star**2)
+		F2 = (sy.exp(self.beta_1*I_star) - self.beta*Sr)**self.m_v
+		Fvp = J2 - F1*F2
+
+		# print(sy.diff(Fvp, s_xx))
 
 		variables = (s_xx, s_yy, s_zz, s_xy, s_xz, s_yz, a_q)
-		self.yield_function = sy.lambdify(variables, Qvp, "numpy")
+		self.yield_function = sy.lambdify(variables, Fvp, "numpy")
 		self.dQdSxx = sy.lambdify(variables, sy.diff(Qvp, s_xx), "numpy")
 		self.dQdSyy = sy.lambdify(variables, sy.diff(Qvp, s_yy), "numpy")
 		self.dQdSzz = sy.lambdify(variables, sy.diff(Qvp, s_zz), "numpy")
