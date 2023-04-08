@@ -10,6 +10,7 @@ from FiniteElements import FemHandler
 from BoundaryConditions import MechanicsBoundaryConditions
 from Simulators import Simulator
 from Models import MaxwellModel
+from Elements import DashpotElement
 from Utils import *
 
 # =========== Maxwell's model =========== #
@@ -64,6 +65,7 @@ def main():
 
 	# Define model
 	model = MaxwellModel(fem_handler, bc_handler, settings)
+	model.add_inelastic_element(DashpotElement(fem_handler, settings, element_name="Dashpot"))
 
 	# Controllers
 	iteration_controller = IterationController("Iterations", max_ite=10)
@@ -72,12 +74,13 @@ def main():
 	# Events
 	avg_eps_tot_saver = AverageSaver(fem_handler.dx(), "eps_tot", model.elastic_element.eps_tot, time_handler, output_folder)
 	avg_eps_e_saver = AverageSaver(fem_handler.dx(), "eps_e", model.elastic_element.eps_e, time_handler, output_folder)
-	avg_eps_ie_saver = AverageSaver(fem_handler.dx(), "eps_ie", model.dashpot_element.eps_ie, time_handler, output_folder)
+	# avg_eps_ie_saver = AverageSaver(fem_handler.dx(), "eps_ie", model.dashpot_element.eps_ie, time_handler, output_folder)
+	avg_eps_ie_saver = AverageSaver(fem_handler.dx(), "eps_ie", model.inelastic_elements[0].eps_ie, time_handler, output_folder)
 
 	vtk_u_saver = VtkSaver("displacement", model.u, time_handler, output_folder)
 	vtk_stress_saver = VtkSaver("stress", model.elastic_element.stress, time_handler, output_folder)
 	vtk_eps_e_saver = VtkSaver("eps_e", model.elastic_element.eps_e, time_handler, output_folder)
-	vtk_eps_ie_saver = VtkSaver("eps_ie", model.dashpot_element.eps_ie, time_handler, output_folder)
+	vtk_eps_ie_saver = VtkSaver("eps_ie", model.inelastic_elements[0].eps_ie, time_handler, output_folder)
 
 	time_level_counter = TimeLevelCounter(time_handler)
 	time_counter = TimeCounter(time_handler)
