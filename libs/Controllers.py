@@ -52,7 +52,7 @@ class ErrorController(Controller):
 		self.variable = np.linalg.norm(self.model.u_k.vector() - self.model.u.vector()) / np.linalg.norm(self.model.u.vector())
 
 	def check(self):
-		if self.ite >= 3: # Iterate at least 2 times
+		if self.ite >= 2: # Iterate at least 2 times
 			return self.variable > self.tol
 		else:
 			return True
