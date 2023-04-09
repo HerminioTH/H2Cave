@@ -151,48 +151,6 @@ class ViscoelasticModel(MechanicsModel):
 		solve(A, self.u.vector(), b, "cg", "ilu")
 
 
-# class MaxwellModel(MechanicsModel):
-# 	def __init__(self, fem_handler, bc_handler, settings):
-# 		super().__init__(fem_handler, bc_handler, settings)
-# 		self.elastic_element = ElasticElement(self.fem_handler, self.settings, element_name="Elastic")
-# 		self.dashpot_element = DashpotElement(self.fem_handler, self.settings, element_name="Dashpot")
-
-# 	def initialize(self, time_handler):
-# 		# Stiffness matrix
-# 		self.elastic_element.build_A()
-
-# 	def execute_model_pre(self, time_handler):
-# 		# Update boundary condition
-# 		self.bc_handler.update_BCs(time_handler)
-
-# 	def execute_iterative_procedure(self, time_handler):
-# 		# rhs vector
-# 		self.dashpot_element.build_b(self.elastic_element.C0)
-# 		b = self.bc_handler.b + self.dashpot_element.b
-
-# 		# Solve linear system
-# 		self.__solve_linear_system(self.elastic_element.A, b)
-# 		# print(np.linalg.norm(self.u.vector()), np.linalg.norm(self.u_k.vector()))
-
-# 		# Compute total strain
-# 		self.elastic_element.compute_total_strain(self.u)
-
-# 		# Compute elastic strain
-# 		self.elastic_element.compute_elastic_strain(eps_ie=self.dashpot_element.eps_ie)
-
-# 		# Compute stress
-# 		self.elastic_element.compute_stress()
-
-# 		# Compute inelastic strain
-# 		self.dashpot_element.compute_viscous_strain(self.elastic_element.stress, time_handler.time_step)
-
-# 	def execute_model_post(self, time_handler):
-# 		self.dashpot_element.update()
-
-# 	def __solve_linear_system(self, A, b):
-# 		[bc.apply(A, b) for bc in self.bc_handler.bcs]
-# 		solve(A, self.u.vector(), b, "cg", "ilu")
-
 
 class MaxwellModel(MechanicsModel):
 	def __init__(self, fem_handler, bc_handler, settings):
@@ -270,42 +228,7 @@ class BurgersModel(MechanicsModel):
 		self.inelastic_elements.append(inelastic_element)
 
 	def initialize(self, time_handler):
-		# # Elastic stiffness matrix
-		self.viscoelastic_element.build_A_elastic()
-
-		# rhs vector due to boundary conditions
-		self.bc_handler.update_BCs(time_handler)
-		b = self.bc_handler.b
-
-		# Apply boundary conditions
-		[bc.apply(self.viscoelastic_element.A_elastic, b) for bc in self.bc_handler.bcs]
-
-		# Solve instantaneous elastic problem
-		solve(self.viscoelastic_element.A_elastic, self.u.vector(), b, "cg", "ilu")
-
-		# Get inelastic strains from dashpots
-		eps_ie = self.__get_eps_ie()
-		eps_ie_old = self.__get_eps_ie_old()
-
-		# Compute constitutive matrices
-		self.viscoelastic_element.compute_constitutive_matrices(time_handler.time_step)
-
-		# Compute strains
-		self.viscoelastic_element.compute_total_strain(self.u)
-		# self.viscoelastic_element.compute_viscoelastic_strain(eps_ie=eps_ie, eps_ie_old=eps_ie_old)
-		# self.viscoelastic_element.compute_elastic_strain(eps_ie=eps_ie)
-
-		# Compute stress
-		# self.viscoelastic_element.compute_stress()
-
-		# # Update inelastic strains
-		# self.__compute_eps_ie(self.viscoelastic_element.stress, time_handler)
-
-		# Update total strain
-		self.viscoelastic_element.update()
-		# self.__update_eps_ie()
-		# pass
-
+		pass
 
 	def execute_model_pre(self, time_handler):
 		# Compute constitutive matrices
