@@ -170,7 +170,7 @@ class MaxwellModel(MechanicsModel):
 		self.bc_handler.update_BCs(time_handler)
 
 	def execute_iterative_procedure(self, time_handler):
-		# Get inelastic strains from dashpots
+		# Get strains from inelastic elements
 		eps_ie = self.__get_eps_ie()
 
 		# rhs vector
@@ -182,7 +182,6 @@ class MaxwellModel(MechanicsModel):
 
 		# Solve linear system
 		self.__solve_linear_system(self.elastic_element.A, b)
-		# print(np.linalg.norm(self.u.vector()), np.linalg.norm(self.u_k.vector()))
 
 		# Compute total strain
 		self.elastic_element.compute_total_strain(self.u)
@@ -192,6 +191,15 @@ class MaxwellModel(MechanicsModel):
 
 		# Compute stress
 		self.elastic_element.compute_stress()
+
+		# n_cells = self.fem_handler.grid.mesh.num_cells()
+		# s = self.elastic_element.stress.vector()[:].copy()
+		# # [9*elem+0, 9*elem+4, 9*elem+8, 9*elem+1, 9*elem+2, 9*elem+5]
+		# self.elastic_element.stress.vector()[:] = np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10e6] for e in range(n_cells)]).flatten()
+		# # self.elastic_element.stress.vector()[:] = np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, s[9*e+8]] for e in range(n_cells)]).flatten()
+		# print(self.elastic_element.stress.vector()[[0, 4, 8, 1, 2, 5]])
+		# elem = 34
+		# print(list(self.elastic_element.stress.vector()[[9*elem+0, 9*elem+4, 9*elem+8, 9*elem+1, 9*elem+2, 9*elem+5]]))
 
 		# Compute inelastic strains
 		self.__compute_eps_ie(self.elastic_element.stress, time_handler)
