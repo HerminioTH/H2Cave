@@ -24,6 +24,7 @@ def save_json(data, file_name):
 def strain2voigt(e):
 	x = 1
 	return fe.as_vector([e[0,0], e[1,1], e[2,2], x*e[0,1], x*e[0,2], x*e[1,2]])
+	# return fe.as_vector([e[0,0], e[1,1], e[2,2], e[0,1], e[0,2], e[1,2]])
 
 def voigt2stress(s):
     return fe.as_matrix([[s[0], s[3], s[4]],
@@ -31,8 +32,8 @@ def voigt2stress(s):
 		    		     [s[4], s[5], s[2]]])
 
 def epsilon(u):
-	# return 0.5*(nabla_grad(u) + nabla_grad(u).T)
-	# return 0.5*(grad(u) + grad(u).T)
+	# return 0.5*(fe.nabla_grad(u) + fe.nabla_grad(u).T)
+	# return 0.5*(fe.grad(u) + fe.grad(u).T)
 	return fe.sym(fe.grad(u))
 
 def sigma(C, eps):
@@ -51,7 +52,8 @@ def local_projection(tensor, V):
 
 def constitutive_matrix_sy(E, nu):
 	lame = E*nu/((1+nu)*(1-2*nu))
-	G = E/(2 +2*nu)
+	# lame = 0.0
+	G = E/(2 + 2*nu)
 	x = 2
 	M = sy.Matrix(6, 6, [ (2*G+lame),	lame,			lame,			0.,		0.,		0.,
 						  lame,			(2*G+lame),		lame,			0.,		0.,		0.,
