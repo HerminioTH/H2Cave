@@ -453,22 +453,22 @@ class ViscoplasticElement(BaseElement):
 
 					# Compute viscoplastic strain rate
 					lmbda = self.mu_1*(Fvp_elem/self.F_0)**self.N_1
-					# strain_rate = -lmbda*flow_direction
+					strain_rate = -lmbda*flow_direction
 
-					# Compute strain rate as if it was dislocation creep
-					sigma = MPa*np.array([[stress_elem[0], stress_elem[3], stress_elem[4]],
-									      [stress_elem[3], stress_elem[1], stress_elem[5]],
-									      [stress_elem[4], stress_elem[5], stress_elem[2]]
-					])
-					s = sigma - (1./3)*(sigma[0,0] + sigma[1,1] + sigma[2,2])*np.eye(3)
-					von_Mises = sqrt((3/2.)*double_dot(s, s))
-					A = 1.6e-40
-					R = 8.32
-					Q = 191600
-					T = 298
-					n = 5
-					B = A*np.exp(-alpha_elem*Q/R/T)
-					strain_rate = -B*(von_Mises**(n-1))*s
+					# # Compute strain rate as if it was dislocation creep
+					# sigma = MPa*np.array([[stress_elem[0], stress_elem[3], stress_elem[4]],
+					# 				      [stress_elem[3], stress_elem[1], stress_elem[5]],
+					# 				      [stress_elem[4], stress_elem[5], stress_elem[2]]
+					# ])
+					# s = sigma - (1./3)*(sigma[0,0] + sigma[1,1] + sigma[2,2])*np.eye(3)
+					# von_Mises = sqrt((3/2.)*double_dot(s, s))
+					# A = 1.6e-40
+					# R = 8.32
+					# Q = 191600
+					# T = 298
+					# n = 5
+					# B = A*np.exp(-alpha_elem*Q/R/T)
+					# strain_rate = -B*(von_Mises**(n-1))*s
 
 
 					# Compute qsi
@@ -505,16 +505,14 @@ class ViscoplasticElement(BaseElement):
 
 			strain_rates_array[e] = strain_rate
 
-		Fvp_ind_min, Fvp_min, Fvp_ind_max, Fvp_max, n_elems, Fvp_avg = self.__compute_min_max_avg(self.Fvp_array)
-		alpha_ind_min, alpha_min, alpha_ind_max, alpha_max, n_elems, alpha_avg = self.__compute_min_max_avg(self.alpha_array)
-		stress_e = self.__get_tensor_at_element(self.stress_MPa, Fvp_ind_min)
-
-		print("| " + "(%i, %.4e) | (%.4e) | (%.4e, %.4e) |"%(Fvp_ind_min, Fvp_min, self.alpha_array[Fvp_ind_min], stress_e[0], stress_e[2]))
-
-		# string = (Fvp_ind_min, Fvp_min, Fvp_ind_max, Fvp_max, n_elems, Fvp_avg)
-		# print("| " + "(%i, %.4e) | (%i, %.4e) | (%i, %.4e) |"%string)
-
 		self.eps_ie_rate.vector()[:] = strain_rates_array.flatten()
+
+		# Fvp_ind_min, Fvp_min, Fvp_ind_max, Fvp_max, n_elems, Fvp_avg = self.__compute_min_max_avg(self.Fvp_array)
+		# alpha_ind_min, alpha_min, alpha_ind_max, alpha_max, n_elems, alpha_avg = self.__compute_min_max_avg(self.alpha_array)
+		# stress_e = self.__get_tensor_at_element(self.stress_MPa, Fvp_ind_min)
+
+		# # print("| " + "(%i, %.4e) | (%.4e) | (%.4e, %.4e) |"%(Fvp_ind_min, Fvp_min, self.alpha_array[Fvp_ind_min], stress_e[0], stress_e[2]))
+		# print("| " + "(%.4e %.4e %.4e) | (%.4e %.4e %.4e) |"%(strain_rate[0,0], strain_rate[1,1], strain_rate[2,2], stress_e[0], stress_e[1], stress_e[2]))
 
 		# self.update_hardening_parameters()
 
@@ -526,7 +524,9 @@ class ViscoplasticElement(BaseElement):
 
 	def __get_tensor_at_element(self, tensor_field, elem):
 		ids = [9*elem+0, 9*elem+4, 9*elem+8, 9*elem+1, 9*elem+2, 9*elem+5]
-		return tensor_field.vector()[ids]
+		tensor_elem = tensor_field.vector()[ids]
+		tensor_elem_filtered = np.where(np.abs(tensor_elem) < 1e-2, 0, tensor_elem)
+		return tensor_elem_filtered
 
 	def __get_scalar_at_element(self, scalar_field, elem):
 		return scalar_field.vector()[elem]
