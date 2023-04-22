@@ -435,7 +435,7 @@ class ViscoplasticElement(BaseElement):
 			# Initialize viscoplastic strain rate
 			strain_rate = np.zeros((3,3))
 
-			if Fvp_elem > 1e-3:
+			if Fvp_elem > 0.0:
 				tol = 1e-16
 				error = 2*tol
 				maxiter = 20
@@ -507,12 +507,12 @@ class ViscoplasticElement(BaseElement):
 
 		self.eps_ie_rate.vector()[:] = strain_rates_array.flatten()
 
-		# Fvp_ind_min, Fvp_min, Fvp_ind_max, Fvp_max, n_elems, Fvp_avg = self.__compute_min_max_avg(self.Fvp_array)
-		# alpha_ind_min, alpha_min, alpha_ind_max, alpha_max, n_elems, alpha_avg = self.__compute_min_max_avg(self.alpha_array)
-		# stress_e = self.__get_tensor_at_element(self.stress_MPa, Fvp_ind_min)
+		Fvp_ind_min, Fvp_min, Fvp_ind_max, Fvp_max, n_elems, Fvp_avg = self.__compute_min_max_avg(self.Fvp_array)
+		alpha_ind_min, alpha_min, alpha_ind_max, alpha_max, n_elems, alpha_avg = self.__compute_min_max_avg(self.alpha_array)
+		stress_e = self.__get_tensor_at_element(self.stress_MPa, Fvp_ind_min)
 
-		# # print("| " + "(%i, %.4e) | (%.4e) | (%.4e, %.4e) |"%(Fvp_ind_min, Fvp_min, self.alpha_array[Fvp_ind_min], stress_e[0], stress_e[2]))
-		# print("| " + "(%.4e %.4e %.4e) | (%.4e %.4e %.4e) |"%(strain_rate[0,0], strain_rate[1,1], strain_rate[2,2], stress_e[0], stress_e[1], stress_e[2]))
+		# print("| " + "(%i, %.4e) | (%.4e) | (%.4e, %.4e) |"%(Fvp_ind_min, Fvp_min, self.alpha_array[Fvp_ind_min], stress_e[0], stress_e[2]))
+		print("| " + "(%.4e %.4e %.4e) | (%.4e %.4e %.4e) |"%(strain_rate[0,0], strain_rate[1,1], strain_rate[2,2], stress_e[0], stress_e[1], stress_e[2]))
 
 		# self.update_hardening_parameters()
 
@@ -525,7 +525,7 @@ class ViscoplasticElement(BaseElement):
 	def __get_tensor_at_element(self, tensor_field, elem):
 		ids = [9*elem+0, 9*elem+4, 9*elem+8, 9*elem+1, 9*elem+2, 9*elem+5]
 		tensor_elem = tensor_field.vector()[ids]
-		tensor_elem_filtered = np.where(np.abs(tensor_elem) < 1e-2, 0, tensor_elem)
+		tensor_elem_filtered = np.where(np.abs(tensor_elem) < 1e-1, 0, tensor_elem)
 		return tensor_elem_filtered
 
 	def __get_scalar_at_element(self, scalar_field, elem):
