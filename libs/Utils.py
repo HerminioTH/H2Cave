@@ -67,5 +67,6 @@ def double_dot(A, B):
 	# Performs the operation A:B, which returns a scalar. 
 	# A and B are second order tensors (2d numpy arrays)
 	return np.tensordot(A, B.T, axes=2)
+	# return float(np.tensordot(A, B, axes=([0, 1], [0, 1])))
 
 ppos = lambda x: (x+abs(x))/2.
