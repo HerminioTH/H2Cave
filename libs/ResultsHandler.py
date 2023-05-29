@@ -163,6 +163,7 @@ class ResultsReader(object):
 		pvd_files = self.get_file_names(folder_files, ".pvd")
 		gmsh_files = self.get_file_names(folder_files, ".msh")
 
+		# pvd_file = self.check_file_names(file_list=pvd_files, file_index=1)
 		pvd_file = self.check_file_names(file_list=pvd_files, file_index=self.pvd_file_index)
 		gmsh_file = self.check_file_names(file_list=gmsh_files, file_index=self.gmsh_file_index)
 
@@ -173,7 +174,6 @@ class ResultsReader(object):
 		return [f for f in folder_files if f.endswith(extension)]
 
 	def check_file_names(self, file_list, file_index):
-		print(len(file_list))
 		if len(file_list) > 1:
 			ext = file_list[0].split(".")[1]
 			print("WARNING: Too many .%s files. Opening %s."%(ext, file_list[file_index]))

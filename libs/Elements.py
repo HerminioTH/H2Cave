@@ -366,6 +366,70 @@ class PressureSolutionCreep(BaseElement):
 		self.eps_ie_old = local_projection(zero_tensor, self.TS)
 		self.eps_ie_rate = local_projection(zero_tensor, self.TS)
 		self.eps_ie_rate_old = local_projection(zero_tensor, self.TS)
+
+
+
+class Damage(BaseElement):
+	def __init__(self, fem_handler, settings, element_name="Damage"):
+		super().__init__(fem_handler)
+		self.element_name = element_name
+		self.theta = settings["Time"]["theta"]
+		self.__load_props(settings)
+		self.__initialize_fields()
+
+	def build_A(self):
+		pass
+
+	def build_b(self, C):
+		b_form = inner(sigma(C, self.eps_ie), epsilon(self.v))*self.dx
+		self.b = assemble(b_form)
+
+	def update(self):
+		self.eps_ie_old.assign(self.eps_ie)
+		self.eps_ie_rate_old.assign(self.eps_ie_rate)
+		self.D_old.assign(self.D)
+		self.D_rate_old.assign(self.D_rate)
+
+	def compute_viscous_strain(self, stress, dt):
+		self.__compute_viscous_strain_rate(stress, dt)
+		self.eps_ie.assign(local_projection(self.eps_ie_old + (dt/day)*(self.theta*self.eps_ie_rate_old + (1 - self.theta)*self.eps_ie_rate), self.TS))
+
+	def __compute_viscous_strain_rate(self, stress, dt):
+		stress_MPa = stress/MPa
+		sigma_m = (1./3)*tr(stress_MPa)
+		s = stress_MPa - sigma_m*Identity(3)
+		von_Mises = sqrt((3/2.)*inner(s, s))
+		sigma_eq = von_Mises*((1 + self.nu + 3*(1 - 2*self.nu)*(sigma_m/von_Mises)**2)*2/3)**0.5
+		self.compute_damage(sigma_eq, dt)
+		aux = self.D.vector()[:]
+		print(aux.min(), aux.max(), np.mean(aux))
+		self.eps_ie_rate.assign(local_projection(self.A*(von_Mises**(self.n-1))*s/((1 - self.D)**self.n), self.TS))
+
+	def compute_damage(self, sigma_eq, dt):
+		self.D_rate.assign(local_projection((sigma_eq/(self.B*(1 - self.D)))**self.r, self.P0))
+		self.D.assign(local_projection(self.D_old + (dt/day)*(self.theta*self.D_rate_old + (1 - self.theta)*self.D_rate), self.P0))
+		aux = self.D.vector()[:]
+		aux[aux > 0.8] = 0.8
+		self.D.vector()[:] = aux
+
+	def __load_props(self, settings):
+		self.B = Constant(settings[self.element_name]["B"])
+		self.r = Constant(settings[self.element_name]["r"])
+		self.n = Constant(settings[self.element_name]["n"])
+		self.nu = Constant(settings[self.element_name]["nu0"])
+		self.A = Constant(settings[self.element_name]["A"])
+
+	def __initialize_fields(self,):
+		zero_tensor = Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","0.0")), degree=0)
+		self.eps_ie = local_projection(zero_tensor, self.TS)
+		self.eps_ie_old = local_projection(zero_tensor, self.TS)
+		self.eps_ie_rate = local_projection(zero_tensor, self.TS)
+		self.eps_ie_rate_old = local_projection(zero_tensor, self.TS)
+		
+		self.D = local_projection(Expression("0.0", degree=0), self.P0)
+		self.D_old = local_projection(Expression("0.0", degree=0), self.P0)
+		self.D_rate = local_projection(Expression("0.0", degree=0), self.P0)
+		self.D_rate_old = local_projection(Expression("0.0", degree=0), self.P0)
 		
 
 
