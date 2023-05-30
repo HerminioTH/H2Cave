@@ -74,10 +74,10 @@ def main():
 	vtk_u_saver = VtkSaver("displacement", model.u, time_handler, output_folder)
 	vtk_stress_saver = VtkSaver("stress", model.elastic_element.stress, time_handler, output_folder)
 
-	time_counter = TimeLevelCounter(time_handler)
+	time_level_counter = TimeLevelCounter(time_handler)
 
 	screen_monitor = ScreenOutput()
-	screen_monitor.add_controller(time_counter, width=10, align="center")
+	screen_monitor.add_controller(time_level_counter, width=10, align="center")
 	screen_monitor.add_controller(time_controller, width=30, align="center")
 
 	# Define simulator
@@ -91,7 +91,7 @@ def main():
 	sim.add_event(avg_eps_e_saver)
 	sim.add_event(vtk_u_saver)
 	sim.add_event(vtk_stress_saver)
-	sim.add_event(time_counter)
+	sim.add_event(time_level_counter)
 	sim.add_event(screen_monitor)
 
 	# Add controllers
