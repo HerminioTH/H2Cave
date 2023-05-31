@@ -16,7 +16,7 @@ from Elements import DashpotElement, DislocationCreep, PressureSolutionCreep, Da
 from Utils import *
 
 # =============================== Complete model ====================================== #
-#  \|                      E1                                                           #
+#  \|                      E1,𝜈                                                         #
 #  \|               ___  /\  /\  __                                                     #
 #  \|     E0,𝜈     |   \/  \/  \/  |   _________    _________    _________              #
 #  \|__  /\  /\  __|               |_____|      |_____|      |_____|      |———--🢂 σ    #
@@ -180,9 +180,8 @@ def H2Cave(settings):
 	print("Elapsed time: %.3f"%((end-start)/minute))
 
 	# Copy .msh mesh to output_folder
-	source = os.path.join(grid_folder, "geom.msh")
-	shutil.copy(source, output_folder)
-	shutil.copy(__file__, os.path.join(output_folder, "copy.py"))
+	shutil.copy(os.path.join(grid_folder, "geom.msh"), output_folder)
+	# shutil.copy(__file__, os.path.join(output_folder, "copy.py"))
 	save_json(settings, os.path.join(output_folder, "settings.json"))
 
 
