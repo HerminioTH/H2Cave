@@ -107,7 +107,7 @@ def H2CaveSimulator(settings):
 	from FiniteElements import FemHandler
 	from BoundaryConditions import MechanicsBoundaryConditions
 	from Simulators import Simulator
-	from Models import MaxwellModel_2, BurgersModel, ElasticModel, ViscoelasticModel
+	from Models import MaxwellModel, BurgersModel, ElasticModel, ViscoelasticModel
 	from Elements import DashpotElement, DislocationCreep, PressureSolutionCreep, Damage
 	from Utils import sec, save_json
 
@@ -136,7 +136,7 @@ def H2CaveSimulator(settings):
 		if len(settings["Model"]) == 1:
 			model = ElasticModel(fem_handler, bc_handler, settings)
 		else:
-			model = MaxwellModel_2(fem_handler, bc_handler, settings)
+			model = MaxwellModel(fem_handler, bc_handler, settings)
 
 	elif "KelvinVoigt" in settings["Model"]:
 		if len(settings["Model"]) == 2:
@@ -222,7 +222,7 @@ def H2CaveSimulator(settings):
 	sim.add_event(time_counter)
 
 	# Build controllers
-	if type(model) == MaxwellModel_2 or type(model) == BurgersModel:
+	if type(model) == MaxwellModel or type(model) == BurgersModel:
 		iteration_controller = IterationController("Iterations", max_ite=20)
 		error_controller = ErrorController("Error", model, tol=1e-8)
 		sim.add_controller(iteration_controller)

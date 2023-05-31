@@ -110,25 +110,6 @@ class ViscoelasticElement(BaseElement):
 		stress_form = voigt2stress(dot(self.C0, strain2voigt(self.eps_e)))
 		self.stress.assign(local_projection(stress_form, self.TS))
 
-	# def compute_stress(self, eps_ie=None, eps_ie_old=None):
-	# 	# Elastic part
-	# 	stress_form = voigt2stress(dot(self.C0, strain2voigt(self.eps_tot)))
-
-	# 	# Viscoelastic part
-	# 	stress_form += -voigt2stress(dot(self.C4, strain2voigt(self.eps_v_old)))
-	# 	eps_theta = self.theta*self.eps_tot_old + (1 - self.theta)*self.eps_tot
-	# 	if eps_ie != None:
-	# 		eps_ie_theta = self.theta*eps_ie_old + (1 - self.theta)*eps_ie
-	# 		eps_theta -= eps_ie_theta
-	# 	stress_form += -voigt2stress(dot(self.C5, strain2voigt(eps_theta)))
-
-	# 	# Inelastic part
-	# 	if eps_ie != None:
-	# 		stress_form += -voigt2stress(dot(self.C0, strain2voigt(eps_ie)))
-
-	# 	# Compute stress
-	# 	self.stress.assign(local_projection(stress_form, self.TS))
-
 	def compute_elastic_strain(self, eps_ie=None):
 		eps = self.eps_tot - self.eps_v
 		if eps_ie != None:
@@ -137,7 +118,6 @@ class ViscoelasticElement(BaseElement):
 
 	def compute_viscoelastic_strain(self, eps_ie=None, eps_ie_old=None):
 		eps_tot_theta = self.theta*self.eps_tot_old + (1 - self.theta)*self.eps_tot
-		# self.eps_tot_theta.assign(local_projection(eps_aux, self.TS))
 		form_v = dot(self.C2, strain2voigt(self.eps_v_old))
 		form_v += dot(self.C3, strain2voigt(eps_tot_theta))
 		if eps_ie != None:
@@ -173,14 +153,6 @@ class ViscoelasticElement(BaseElement):
 		self.eps_v = local_projection(zero_tensor, self.TS)
 		self.eps_v_old = local_projection(zero_tensor, self.TS)
 		self.eps_tot_old = local_projection(zero_tensor, self.TS)
-		# self.eps_tot_theta = local_projection(zero_tensor, self.TS)
-
-	# def __load_props(self, settings):
-	# 	self.E0 = Constant(settings[self.element_name]["E0"])
-	# 	self.nu0 = Constant(settings[self.element_name]["nu0"])
-	# 	self.E1 = Constant(settings[self.element_name]["E1"])
-	# 	self.nu1 = Constant(settings[self.element_name]["nu1"])
-	# 	self.eta = Constant(settings[self.element_name]["eta"])
 
 	def __load_props(self, settings):
 		self.E0 = Constant(settings["Elements"]["Spring"]["E"])

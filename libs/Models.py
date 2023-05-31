@@ -151,11 +151,10 @@ class ViscoelasticModel(MechanicsModel):
 		solve(A, self.u.vector(), b, "cg", "ilu")
 
 
-
 class MaxwellModel(MechanicsModel):
 	def __init__(self, fem_handler, bc_handler, settings):
 		super().__init__(fem_handler, bc_handler, settings)
-		self.elastic_element = ElasticElement(self.fem_handler, self.settings, element_name="Elastic")
+		self.elastic_element = ElasticElement(self.fem_handler, self.settings, element_name="Spring")
 		self.inelastic_elements = []
 
 	def add_inelastic_element(self, inelastic_element):
@@ -165,48 +164,62 @@ class MaxwellModel(MechanicsModel):
 		# Stiffness matrix
 		self.elastic_element.build_A()
 
+		# Number of inelastic elements plugged in the model
+		self.number_of_inelastic_elements = len(self.inelastic_elements)
+
 	def execute_model_pre(self, time_handler):
 		# Update boundary condition
 		self.bc_handler.update_BCs(time_handler)
 
+		# If only a Hookean spring is considered, then...
+		if self.number_of_inelastic_elements == 0:
+			# Solve linear system
+			self.__solve_linear_system(self.elastic_element.A, self.bc_handler.b)
+
+			# Compute strains
+			self.elastic_element.compute_total_strain(self.u)
+			self.elastic_element.compute_elastic_strain()
+
+			# Compute stress
+			self.elastic_element.compute_stress()
+
 	def execute_iterative_procedure(self, time_handler):
-		# Get strains from inelastic elements
-		eps_ie = self.__get_eps_ie()
+		# If only a Hookean spring is considered, then...
+		if self.number_of_inelastic_elements == 0:
+			pass
+		else:
+			# Get strains from inelastic elements
+			eps_ie = self.__get_eps_ie()
 
-		# rhs vector
-		b = 0
-		for ie_element in self.inelastic_elements:
-			ie_element.build_b(self.elastic_element.C0)
-			b += ie_element.b
-		b += self.bc_handler.b
+			# rhs vector
+			b = 0
+			for ie_element in self.inelastic_elements:
+				ie_element.build_b(self.elastic_element.C0)
+				b += ie_element.b
+			b += self.bc_handler.b
 
-		# Solve linear system
-		self.__solve_linear_system(self.elastic_element.A, b)
+			# Solve linear system
+			self.__solve_linear_system(self.elastic_element.A, b)
 
-		# Compute total strain
-		self.elastic_element.compute_total_strain(self.u)
+			# Compute total strain
+			self.elastic_element.compute_total_strain(self.u)
 
-		# Compute elastic strain
-		self.elastic_element.compute_elastic_strain(eps_ie=eps_ie)
+			# Compute elastic strain
+			self.elastic_element.compute_elastic_strain(eps_ie=eps_ie)
 
-		# Compute stress
-		self.elastic_element.compute_stress()
+			# Compute stress
+			self.elastic_element.compute_stress()
 
-		# n_cells = self.fem_handler.grid.mesh.num_cells()
-		# s = self.elastic_element.stress.vector()[:].copy()
-		# # [9*elem+0, 9*elem+4, 9*elem+8, 9*elem+1, 9*elem+2, 9*elem+5]
-		# self.elastic_element.stress.vector()[:] = np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10e6] for e in range(n_cells)]).flatten()
-		# # self.elastic_element.stress.vector()[:] = np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, s[9*e+8]] for e in range(n_cells)]).flatten()
-		# print(self.elastic_element.stress.vector()[[0, 4, 8, 1, 2, 5]])
-		# elem = 34
-		# print(list(self.elastic_element.stress.vector()[[9*elem+0, 9*elem+4, 9*elem+8, 9*elem+1, 9*elem+2, 9*elem+5]]))
-
-		# Compute inelastic strains
-		self.__compute_eps_ie(self.elastic_element.stress, time_handler)
+			# Compute inelastic strains
+			self.__compute_eps_ie(self.elastic_element.stress, time_handler)
 
 	def execute_model_post(self, time_handler):
-		for ie_element in self.inelastic_elements:
-			ie_element.update()
+		# If only a Hookean spring is considered, then...
+		if self.number_of_inelastic_elements == 0:
+			pass
+		else:
+			for ie_element in self.inelastic_elements:
+				ie_element.update()
 
 	def __solve_linear_system(self, A, b):
 		[bc.apply(A, b) for bc in self.bc_handler.bcs]
@@ -443,92 +456,3 @@ class GeneralModel(MechanicsModel):
 
 
 
-
-
-class MaxwellModel_2(MechanicsModel):
-	def __init__(self, fem_handler, bc_handler, settings):
-		super().__init__(fem_handler, bc_handler, settings)
-		self.elastic_element = ElasticElement(self.fem_handler, self.settings, element_name="Spring")
-		self.inelastic_elements = []
-
-	def add_inelastic_element(self, inelastic_element):
-		self.inelastic_elements.append(inelastic_element)
-
-	def initialize(self, time_handler):
-		# Stiffness matrix
-		self.elastic_element.build_A()
-
-		# Number of inelastic elements plugged in the model
-		self.number_of_inelastic_elements = len(self.inelastic_elements)
-
-	def execute_model_pre(self, time_handler):
-		# Update boundary condition
-		self.bc_handler.update_BCs(time_handler)
-
-		# If only a Hookean spring is considered, then...
-		if self.number_of_inelastic_elements == 0:
-			# Solve linear system
-			self.__solve_linear_system(self.elastic_element.A, self.bc_handler.b)
-
-			# Compute strains
-			self.elastic_element.compute_total_strain(self.u)
-			self.elastic_element.compute_elastic_strain()
-
-			# Compute stress
-			self.elastic_element.compute_stress()
-
-
-	def execute_iterative_procedure(self, time_handler):
-		# If only a Hookean spring is considered, then...
-		if self.number_of_inelastic_elements == 0:
-			pass
-		else:
-			# Get strains from inelastic elements
-			eps_ie = self.__get_eps_ie()
-
-			# rhs vector
-			b = 0
-			for ie_element in self.inelastic_elements:
-				ie_element.build_b(self.elastic_element.C0)
-				b += ie_element.b
-			b += self.bc_handler.b
-
-			# Solve linear system
-			self.__solve_linear_system(self.elastic_element.A, b)
-
-			# Compute total strain
-			self.elastic_element.compute_total_strain(self.u)
-
-			# Compute elastic strain
-			self.elastic_element.compute_elastic_strain(eps_ie=eps_ie)
-
-			# Compute stress
-			self.elastic_element.compute_stress()
-
-			# Compute inelastic strains
-			self.__compute_eps_ie(self.elastic_element.stress, time_handler)
-
-	def execute_model_post(self, time_handler):
-		# If only a Hookean spring is considered, then...
-		if self.number_of_inelastic_elements == 0:
-			pass
-		else:
-			for ie_element in self.inelastic_elements:
-				ie_element.update()
-
-	def __solve_linear_system(self, A, b):
-		[bc.apply(A, b) for bc in self.bc_handler.bcs]
-		solve(A, self.u.vector(), b, "cg", "ilu")
-
-	def __get_eps_ie(self):
-		eps_ie = 0
-		for ie_element in self.inelastic_elements:
-			eps_ie += ie_element.eps_ie
-		if eps_ie == 0:
-			return None
-		else:
-			return eps_ie
-
-	def __compute_eps_ie(self, stress, time_handler):
-		for ie_element in self.inelastic_elements:
-			ie_element.compute_viscous_strain(stress, time_handler.time_step)
