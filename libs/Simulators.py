@@ -247,6 +247,6 @@ def H2CaveSimulator(settings):
 	print("Elapsed time: %.3f"%((end-start)/sec))
 
 	# Copy .msh mesh to output_folder
-	shutil.copy(os.path.join(grid_folder, "geom.msh"), output_folder)
+	shutil.copy(os.path.join(grid_folder, "geom.msh"), os.path.join(output_folder, "vtk"))
 	# shutil.copy(__file__, os.path.join(output_folder, "copy.py"))
 	save_json(settings, os.path.join(output_folder, "settings.json"))
