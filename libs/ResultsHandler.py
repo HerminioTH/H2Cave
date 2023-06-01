@@ -4,41 +4,42 @@ import numpy as np
 import pandas as pd
 from abc import ABC, abstractmethod
 
-class Saver():
-	@abstractmethod
-	def record(self):
-		pass
+# class Saver():
+# 	@abstractmethod
+# 	def record(self):
+# 		pass
 
-	@abstractmethod
-	def save(self):
-		pass
+# 	@abstractmethod
+# 	def save(self):
+# 		pass
 
-class AverageSaver(Saver):
-	def __init__(self, dx, field_name, field, time_handler, output_folder):
-		self.saver = TensorSaver(field_name, dx)
-		self.field = field
-		self.time_handler = time_handler
-		self.output_folder = output_folder
+# class AverageSaver(Saver):
+# 	def __init__(self, dx, field_name, field, time_handler, output_folder):
+# 		self.saver = TensorSaver(field_name, dx)
+# 		self.field = field
+# 		self.time_handler = time_handler
+# 		self.output_folder = output_folder
 
-	def record(self):
-		self.saver.record_average(self.field, self.time_handler.time)
+# 	def record(self):
+# 		self.saver.record_average(self.field, self.time_handler.time)
 
-	def save(self):
-		self.saver.save(os.path.join(self.output_folder, "avg"))
+# 	def save(self):
+# 		self.saver.save(os.path.join(self.output_folder, "avg"))
 
-class VtkSaver(Saver):
-	def __init__(self, field_name, field, time_handler, output_folder):
-		from fenics import File
-		self.field = field
-		self.time_handler = time_handler
-		self.output_folder = output_folder
-		self.vtk = File(os.path.join(output_folder, "vtk", f"{field_name}.pvd"))
+# class VtkSaver(Saver):
+# 	def __init__(self, field_name, field, time_handler, output_folder):
+# 		from fenics import File
+# 		self.field = field
+# 		self.time_handler = time_handler
+# 		self.output_folder = output_folder
+# 		self.vtk = File(os.path.join(output_folder, f"{field_name}.pvd"))
+# 		# self.vtk = File(os.path.join(output_folder, "vtk", f"{field_name}.pvd"))
 
-	def record(self):
-		self.vtk << (self.field, self.time_handler.time)
+# 	def record(self):
+# 		self.vtk << (self.field, self.time_handler.time)
 
-	def save(self):
-		pass
+# 	def save(self):
+# 		pass
 
 class TensorSaver():
 	def __init__(self, name, dx):
@@ -60,23 +61,48 @@ class TensorSaver():
 			"22": []
 		}
 
-	def get_average(self, tensor):
-		return self.fe.assemble(tensor*self.dx)/self.vol
+	def get_average(self, sigma_ij):
+		return self.fe.assemble(sigma_ij*self.dx)/self.vol
 
 	def record_average(self, tensor, t):
 		self.tensor_data["Time"].append(t)
 		for i in range(3):
 			for j in range(3):
-				avg_value = self.get_average(tensor[i,j])
+				sigma_ij = tensor[i,j]
+				avg_value = self.get_average(sigma_ij)
 				self.tensor_data[f"{i}{j}"].append(avg_value)
-
-	def build_dataframe(self):
-		self.df = pd.DataFrame(self.tensor_data)
 
 	def save(self, output_folder):
 		if not os.path.exists(output_folder):
 			os.makedirs(output_folder)
-		self.build_dataframe()
+		self.df = pd.DataFrame(self.tensor_data)
+		self.df.to_excel(os.path.join(output_folder, f"{self.name}.xlsx"))
+		# df.to_csv(os.path.join(output_folder, f"{self.name}.csv"))
+
+class ScalarSaver():
+	def __init__(self, name, dx):
+		import fenics as fe
+		self.fe = fe
+		self.name = name
+		self.dx = dx
+		self.vol = fe.assemble(1*self.dx)
+		self.scalar_data = {
+			"Time": [],
+			"Scalar": []
+		}
+
+	def get_average(self, scalar):
+		return self.fe.assemble(scalar*self.dx)/self.vol
+
+	def record_average(self, scalar, t):
+		self.scalar_data["Time"].append(t)
+		avg_value = self.get_average(scalar)
+		self.scalar_data["Scalar"].append(avg_value)
+
+	def save(self, output_folder):
+		if not os.path.exists(output_folder):
+			os.makedirs(output_folder)
+		self.df = pd.DataFrame(self.scalar_data)
 		self.df.to_excel(os.path.join(output_folder, f"{self.name}.xlsx"))
 		# df.to_csv(os.path.join(output_folder, f"{self.name}.csv"))
 
@@ -137,6 +163,7 @@ class ResultsReader(object):
 		pvd_files = self.get_file_names(folder_files, ".pvd")
 		gmsh_files = self.get_file_names(folder_files, ".msh")
 
+		# pvd_file = self.check_file_names(file_list=pvd_files, file_index=1)
 		pvd_file = self.check_file_names(file_list=pvd_files, file_index=self.pvd_file_index)
 		gmsh_file = self.check_file_names(file_list=gmsh_files, file_index=self.gmsh_file_index)
 
@@ -147,7 +174,6 @@ class ResultsReader(object):
 		return [f for f in folder_files if f.endswith(extension)]
 
 	def check_file_names(self, file_list, file_index):
-		print(len(file_list))
 		if len(file_list) > 1:
 			ext = file_list[0].split(".")[1]
 			print("WARNING: Too many .%s files. Opening %s."%(ext, file_list[file_index]))
