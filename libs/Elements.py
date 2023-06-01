@@ -36,7 +36,7 @@ class BaseElement(metaclass=abc.ABCMeta):
 
 
 class ElasticElement(BaseElement):
-	def __init__(self, fem_handler, settings, element_name="Elastic"):
+	def __init__(self, fem_handler, settings, element_name="Spring"):
 		super().__init__(fem_handler)
 		self.element_name = element_name
 		self.A = 0
@@ -69,8 +69,8 @@ class ElasticElement(BaseElement):
 		self.stress = local_projection(zero_tensor, self.TS)
 
 	def __load_props(self, settings):
-		self.E = Constant(settings[self.element_name]["E"])
-		self.nu = Constant(settings[self.element_name]["nu"])
+		self.E = Constant(settings["Elements"][self.element_name]["E"])
+		self.nu = Constant(settings["Elements"][self.element_name]["nu"])
 
 	def __initialize_constitutive_matrices(self):
 		self.C0_sy = constitutive_matrix_sy(self.E, self.nu)
@@ -110,25 +110,6 @@ class ViscoelasticElement(BaseElement):
 		stress_form = voigt2stress(dot(self.C0, strain2voigt(self.eps_e)))
 		self.stress.assign(local_projection(stress_form, self.TS))
 
-	# def compute_stress(self, eps_ie=None, eps_ie_old=None):
-	# 	# Elastic part
-	# 	stress_form = voigt2stress(dot(self.C0, strain2voigt(self.eps_tot)))
-
-	# 	# Viscoelastic part
-	# 	stress_form += -voigt2stress(dot(self.C4, strain2voigt(self.eps_v_old)))
-	# 	eps_theta = self.theta*self.eps_tot_old + (1 - self.theta)*self.eps_tot
-	# 	if eps_ie != None:
-	# 		eps_ie_theta = self.theta*eps_ie_old + (1 - self.theta)*eps_ie
-	# 		eps_theta -= eps_ie_theta
-	# 	stress_form += -voigt2stress(dot(self.C5, strain2voigt(eps_theta)))
-
-	# 	# Inelastic part
-	# 	if eps_ie != None:
-	# 		stress_form += -voigt2stress(dot(self.C0, strain2voigt(eps_ie)))
-
-	# 	# Compute stress
-	# 	self.stress.assign(local_projection(stress_form, self.TS))
-
 	def compute_elastic_strain(self, eps_ie=None):
 		eps = self.eps_tot - self.eps_v
 		if eps_ie != None:
@@ -137,7 +118,6 @@ class ViscoelasticElement(BaseElement):
 
 	def compute_viscoelastic_strain(self, eps_ie=None, eps_ie_old=None):
 		eps_tot_theta = self.theta*self.eps_tot_old + (1 - self.theta)*self.eps_tot
-		# self.eps_tot_theta.assign(local_projection(eps_aux, self.TS))
 		form_v = dot(self.C2, strain2voigt(self.eps_v_old))
 		form_v += dot(self.C3, strain2voigt(eps_tot_theta))
 		if eps_ie != None:
@@ -173,14 +153,13 @@ class ViscoelasticElement(BaseElement):
 		self.eps_v = local_projection(zero_tensor, self.TS)
 		self.eps_v_old = local_projection(zero_tensor, self.TS)
 		self.eps_tot_old = local_projection(zero_tensor, self.TS)
-		# self.eps_tot_theta = local_projection(zero_tensor, self.TS)
 
 	def __load_props(self, settings):
-		self.E0 = Constant(settings[self.element_name]["E0"])
-		self.nu0 = Constant(settings[self.element_name]["nu0"])
-		self.E1 = Constant(settings[self.element_name]["E1"])
-		self.nu1 = Constant(settings[self.element_name]["nu1"])
-		self.eta = Constant(settings[self.element_name]["eta"])
+		self.E0 = Constant(settings["Elements"]["Spring"]["E"])
+		self.nu0 = Constant(settings["Elements"]["Spring"]["nu"])
+		self.E1 = Constant(settings["Elements"]["KelvinVoigt"]["E"])
+		self.nu1 = Constant(settings["Elements"]["KelvinVoigt"]["nu"])
+		self.eta = Constant(settings["Elements"]["KelvinVoigt"]["eta"])
 
 
 	def __initialize_constitutive_matrices(self):
@@ -268,7 +247,7 @@ class DashpotElement(BaseElement):
 		self.eps_ie_rate.assign(local_projection((1/self.eta)*stress, self.TS))
 
 	def __load_props(self, settings):
-		self.eta = Constant(settings[self.element_name]["eta"])
+		self.eta = Constant(settings["Elements"][self.element_name]["eta"])
 
 	def __initialize_tensors(self,):
 		zero_tensor = Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","0.0")), degree=0)
@@ -308,9 +287,9 @@ class DislocationCreep(BaseElement):
 		self.eps_ie_rate.assign(local_projection(self.B*(von_Mises**(self.n-1))*s, self.TS))
 
 	def __load_props(self, settings):
-		self.A = Constant(settings[self.element_name]["A"])
-		self.n = Constant(settings[self.element_name]["n"])
-		self.T = Constant(settings[self.element_name]["T"])
+		self.A = Constant(settings["Elements"][self.element_name]["A"])
+		self.n = Constant(settings["Elements"][self.element_name]["n"])
+		self.T = Constant(settings["Elements"][self.element_name]["T"])
 		self.R = 8.32		# Universal gas constant
 		self.Q = 51600  	# Creep activation energy, [J/mol]
 		self.B = float(self.A)*np.exp(-self.Q/(self.R*float(self.T)))
@@ -351,9 +330,9 @@ class PressureSolutionCreep(BaseElement):
 		self.eps_ie_rate.assign(local_projection(self.B*s, self.TS))
 
 	def __load_props(self, settings):
-		self.A = Constant(settings[self.element_name]["A"])
-		self.n = Constant(settings[self.element_name]["n"])
-		self.d = Constant(settings[self.element_name]["d"])
+		self.A = Constant(settings["Elements"][self.element_name]["A"])
+		self.n = Constant(settings["Elements"][self.element_name]["n"])
+		self.d = Constant(settings["Elements"][self.element_name]["d"])
 		# self.T = Constant(settings[self.element_name]["T"])
 		# self.R = 8.32		# Universal gas constant
 		# self.Q = 51600  	# Creep activation energy, [J/mol]
@@ -413,11 +392,11 @@ class Damage(BaseElement):
 		self.D.vector()[:] = aux
 
 	def __load_props(self, settings):
-		self.B = Constant(settings[self.element_name]["B"])
-		self.r = Constant(settings[self.element_name]["r"])
-		self.n = Constant(settings[self.element_name]["n"])
-		self.nu = Constant(settings[self.element_name]["nu0"])
-		self.A = Constant(settings[self.element_name]["A"])
+		self.B = Constant(settings["Elements"][self.element_name]["B"])
+		self.r = Constant(settings["Elements"][self.element_name]["r"])
+		self.n = Constant(settings["Elements"][self.element_name]["n"])
+		self.nu = Constant(settings["Elements"][self.element_name]["nu0"])
+		self.A = Constant(settings["Elements"][self.element_name]["A"])
 
 	def __initialize_fields(self,):
 		zero_tensor = Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","0.0")), degree=0)

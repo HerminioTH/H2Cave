@@ -1,116 +1,66 @@
+import os
+import sys
+import numpy as np
+import time
+import shutil
+sys.path.append(os.path.join("..", "..", "libs"))
+from Grid import GridHandler
+from Events import VtkSaver, AverageSaver, AverageScalerSaver, ScreenOutput, TimeLevelCounter, TimeCounter
+from Controllers import TimeController, IterationController, ErrorController
+from Time import TimeHandler
+from FiniteElements import FemHandler
+from BoundaryConditions import MechanicsBoundaryConditions
+from Simulators import Simulator
+from Models import MaxwellModel_2, BurgersModel, ElasticModel, ViscoelasticModel
+from Elements import DashpotElement, DislocationCreep, PressureSolutionCreep, Damage
+from Utils import *
+
+# =============================== Complete model ====================================== #
+#  \|                      E1,𝜈                                                         #
+#  \|               ___  /\  /\  __                                                     #
+#  \|     E0,𝜈     |   \/  \/  \/  |   _________    _________    _________              #
+#  \|__  /\  /\  __|               |_____|      |_____|      |_____|      |———--🢂 σ    #
+#  \|  \/  \/  \/  |   _________   |     |  η2  |     |  η3  |     |  η3  |             #
+#  \|              |_____|      |__|   ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅     ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅     ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅               #
+#  \|                    |  η1  |                                                       #
+#                      ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅ ̅                                                         #
+#   |——— Ɛ_e ————|—————— Ɛ_v ——————|——— Ɛ_cr ———|——— Ɛ_ps ———|——— Ɛ_d ————|             #
+#   |—————————————————————————————— Ɛ_tot ————————————————————————————————|             #
+#                                                                                       #
+#   Ɛ_e   - elastic strain                                                              #
+#   Ɛ_v   - viscoelastic strain                                                         #
+#   Ɛ_cr  - dislocation creep strain                                                    #
+#   Ɛ_ps  - pressure solution creep strain                                              #
+#   Ɛ_d   - damage model for teriary creep strain                                       #
+#   Ɛ_tot - total strain                                                                #
+# ===================================================================================== #
 
 
-class Simulator():
-	def __init__(self, time_handler):
-		self.time_handler = time_handler
-		self.models = []
-		self.events = []
-		self.controllers = []
+def write_settings(settings):
+	# Define time levels
+	n_steps = 20
+	t_f = 24*hour
+	settings["Time"]["timeList"] = list(np.linspace(0, t_f, n_steps))
 
-	def execute_models_pre(self):
-		for model in self.models:
-			model.execute_model_pre(self.time_handler)
+	# Define boundary conditions
+	for u_i in settings["BoundaryConditions"].keys():
+		for boundary_name in settings["BoundaryConditions"][u_i]:
+			settings["BoundaryConditions"][u_i][boundary_name]["value"] = list(np.repeat(0.0, n_steps))
 
-	def execute_models_post(self):
-		for model in self.models:
-			model.execute_model_post(self.time_handler)
+	settings["BoundaryConditions"]["u_z"]["TOP"]["value"] = list(np.repeat(-12*MPa, n_steps))
 
-	def execute_iterative_procedures(self):
-		for model in self.models:
-			model.execute_iterative_procedure(self.time_handler)
+	# Create a name using the elements of the model
+	name = settings["Model"][0]
+	for elem in settings["Model"][1:]:
+		name += f"_{elem}"
+	settings["Paths"]["Output"] = os.path.join(*settings["Paths"]["Output"].split("/"), name)
 
-	def update_solution_vector(self):
-		for model in self.models:
-			model.update_solution_vector()
-
-	def add_model(self, model):
-		self.models.append(model)
-
-	def initialize_models(self):
-		for model in self.models:
-			model.initialize(self.time_handler)
-
-	def add_controller(self, controller):
-		self.controllers.append(controller)
-
-	def reset_controllers(self):
-		for controller in self.controllers:
-			controller.reset()
-
-	def execute_controllers(self):
-		for controller in self.controllers:
-			controller.execute()
-
-	def check_controllers(self):
-		if len(self.controllers) == 0:
-			return False
-		else:
-			for controller in self.controllers:
-				if not controller.check():
-					return False
-			return True
-
-	def add_event(self, event):
-		self.events.append(event)
-
-	def initialize_events(self):
-		for event in self.events:
-			event.initialize()
-
-	def execute_events(self):
-		for event in self.events:
-			event.execute()
-
-	def finalize_events(self):
-		for event in self.events:
-			event.finalize()
-
-	def is_final_time_reached(self):
-		return self.time_handler.is_final_time_reached()
-
-	def advance_time(self):
-		self.time_handler.advance_time()
-
-	def run(self):
-		self.initialize_models()
-		self.initialize_events()
-
-		# Time marching
-		while not self.is_final_time_reached():
-			self.advance_time()
-			self.execute_models_pre()
-			self.reset_controllers()
-
-			# Begin iterative loop
-			while self.check_controllers():
-				self.update_solution_vector()
-				self.execute_iterative_procedures()
-				self.execute_controllers()
-
-			self.execute_models_post()
-			self.execute_events()
-
-		# Write results
-		self.finalize_events()
-		
+	# # Dump to file
+	# save_json(settings, "settings.json")
+	return settings
 
 
-
-def H2CaveSimulator(settings):
-	import os
-	import time
-	import shutil
-	from Grid import GridHandler
-	from Events import VtkSaver, AverageSaver, AverageScalerSaver, ScreenOutput, TimeLevelCounter, TimeCounter
-	from Controllers import TimeController, IterationController, ErrorController
-	from Time import TimeHandler
-	from FiniteElements import FemHandler
-	from BoundaryConditions import MechanicsBoundaryConditions
-	from Simulators import Simulator
-	from Models import MaxwellModel, BurgersModel, ElasticModel, ViscoelasticModel
-	from Elements import DashpotElement, DislocationCreep, PressureSolutionCreep, Damage
-	from Utils import sec, save_json
-
+def H2Cave(settings):
 	# Define folders
 	output_folder = os.path.join(*settings["Paths"]["Output"].split("/"))
 	grid_folder = os.path.join(*settings["Paths"]["Grid"].split("/"))
@@ -136,7 +86,7 @@ def H2CaveSimulator(settings):
 		if len(settings["Model"]) == 1:
 			model = ElasticModel(fem_handler, bc_handler, settings)
 		else:
-			model = MaxwellModel(fem_handler, bc_handler, settings)
+			model = MaxwellModel_2(fem_handler, bc_handler, settings)
 
 	elif "KelvinVoigt" in settings["Model"]:
 		if len(settings["Model"]) == 2:
@@ -178,33 +128,16 @@ def H2CaveSimulator(settings):
 	if settings["Elements"]["Spring"]["save_total_strain_avg"] == True:
 		field_name = settings["Elements"]["Spring"]["total_strain_name"]
 		sim.add_event(AverageSaver(fem_handler.dx(), field_name, model.elastic_element.eps_tot, time_handler, output_folder))
-	
-	# Save elastic strain field
-	if settings["Elements"]["Spring"]["save_strain_vtk"] == True:
-		field_name = settings["Elements"]["Spring"]["strain_name"]
-		sim.add_event(VtkSaver(field_name, model.elastic_element.eps_e, time_handler, output_folder))
-	if settings["Elements"]["Spring"]["save_strain_avg"] == True:
-		field_name = settings["Elements"]["Spring"]["strain_name"]
-		sim.add_event(AverageSaver(fem_handler.dx(), field_name, model.elastic_element.eps_e, time_handler, output_folder))
 
-	# Save viscoelastic strain field
-	if "KelvinVoigt" in settings["Model"]:
-		if settings["Elements"]["KelvinVoigt"]["save_strain_vtk"] == True:
-			field_name = settings["Elements"]["KelvinVoigt"]["strain_name"]
-			sim.add_event(VtkSaver(field_name, model.elastic_element.eps_v, time_handler, output_folder))
-		if settings["Elements"]["KelvinVoigt"]["save_strain_avg"] == True:
-			field_name = settings["Elements"]["KelvinVoigt"]["strain_name"]
-			sim.add_event(AverageSaver(fem_handler.dx(), field_name, model.elastic_element.eps_v, time_handler, output_folder))
-
-	# Save inelastic strain fields
-	for element_name in inelastic_elements:
-		index = inelastic_elements.index(element_name)
+	# Save strain fields
+	for element_name in settings["Model"]:
+		print(element_name)
 		if settings["Elements"][element_name]["save_strain_vtk"] == True:
 			field_name = settings["Elements"][element_name]["strain_name"]
-			sim.add_event(VtkSaver(field_name, model.inelastic_elements[index].eps_ie, time_handler, output_folder))
+			sim.add_event(VtkSaver(field_name, model.elastic_element.eps_e, time_handler, output_folder))
 		if settings["Elements"][element_name]["save_strain_avg"] == True:
 			field_name = settings["Elements"][element_name]["strain_name"]
-			sim.add_event(AverageSaver(fem_handler.dx(), field_name, model.inelastic_elements[index].eps_ie, time_handler, output_folder))
+			sim.add_event(AverageSaver(fem_handler.dx(), field_name, model.elastic_element.eps_e, time_handler, output_folder))
 
 	# If damage model is included, save damage field
 	if "Damage" in inelastic_elements:
@@ -222,7 +155,7 @@ def H2CaveSimulator(settings):
 	sim.add_event(time_counter)
 
 	# Build controllers
-	if type(model) == MaxwellModel or type(model) == BurgersModel:
+	if type(model) == MaxwellModel_2 or type(model) == BurgersModel:
 		iteration_controller = IterationController("Iterations", max_ite=20)
 		error_controller = ErrorController("Error", model, tol=1e-8)
 		sim.add_controller(iteration_controller)
@@ -244,9 +177,24 @@ def H2CaveSimulator(settings):
 	start = time.time()
 	sim.run()
 	end = time.time()
-	print("Elapsed time: %.3f"%((end-start)/sec))
+	print("Elapsed time: %.3f"%((end-start)/minute))
 
 	# Copy .msh mesh to output_folder
-	shutil.copy(os.path.join(grid_folder, "geom.msh"), os.path.join(output_folder, "vtk"))
+	shutil.copy(os.path.join(grid_folder, "geom.msh"), output_folder)
 	# shutil.copy(__file__, os.path.join(output_folder, "copy.py"))
 	save_json(settings, os.path.join(output_folder, "settings.json"))
+
+
+def main():
+	# Read settings
+	settings = read_json("settings.json")
+
+	# Write settings
+	settings = write_settings(settings)
+
+	# Build simulation and run
+	H2Cave(settings)
+
+
+if __name__ == "__main__":
+	main()

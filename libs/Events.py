@@ -132,8 +132,8 @@ class VtkSaver(Event):
 		from fenics import File
 		self.field = field
 		self.time_handler = time_handler
-		self.output_folder = output_folder
-		self.vtk = File(os.path.join(output_folder, f"{field_name}.pvd"))
+		self.output_folder = os.path.join(output_folder, "vtk")
+		self.vtk = File(os.path.join(self.output_folder, f"{field_name}.pvd"))
 
 	def initialize(self):
 		pass
