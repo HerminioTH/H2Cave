@@ -60,21 +60,21 @@ class TensorSaver():
 
 
 class BaseSolution():
-	def __init__(self, settings):
-		self.__load_time_list(settings)
-		self.__build_sigmas(settings)
+	def __init__(self, input_bc):
+		self.__load_time_list(input_bc)
+		self.__build_sigmas(input_bc)
 
-	def __load_time_list(self, settings):
-		self.time_list = np.array(settings["time"])
+	def __load_time_list(self, input_model):
+		self.time_list = np.array(input_model["Time"]["timeList"])
 
-	def __build_sigmas(self, settings):
-		n = len(settings["sigma_xx"])
-		sigma_xx = np.array(settings["sigma_xx"]).reshape((1, n))
-		sigma_yy = np.array(settings["sigma_yy"]).reshape((1, n))
-		sigma_zz = np.array(settings["sigma_zz"]).reshape((1, n))
-		sigma_xy = np.array(settings["sigma_xy"]).reshape((1, n))
-		sigma_yz = np.array(settings["sigma_yz"]).reshape((1, n))
-		sigma_xz = np.array(settings["sigma_xz"]).reshape((1, n))
+	def __build_sigmas(self, input_bc):
+		n = len(input_bc["sigma_xx"])
+		sigma_xx = np.array(input_bc["sigma_xx"]).reshape((1, n))
+		sigma_yy = np.array(input_bc["sigma_yy"]).reshape((1, n))
+		sigma_zz = np.array(input_bc["sigma_zz"]).reshape((1, n))
+		sigma_xy = np.array(input_bc["sigma_xy"]).reshape((1, n))
+		sigma_yz = np.array(input_bc["sigma_yz"]).reshape((1, n))
+		sigma_xz = np.array(input_bc["sigma_xz"]).reshape((1, n))
 		self.sigmas = np.concatenate((sigma_xx, sigma_yy, sigma_zz, sigma_xy, sigma_xz, sigma_yz)).T
 		self.sigma_0 = self.sigmas[0]
 
@@ -100,15 +100,15 @@ class BaseSolution():
 
 
 class Elastic(BaseSolution):
-	def __init__(self, settings):
-		super().__init__(settings)
-		self.__load_properties(settings)
+	def __init__(self, input_model, input_bc):
+		super().__init__(input_bc)
+		self.__load_properties(input_model)
 		self.build_stress_increments()
 		self.build_matrix(self.E0, self.nu0)
 
-	def __load_properties(self, settings):
-		self.E0 = settings["elasticity"]["E"]
-		self.nu0 = settings["elasticity"]["nu"]
+	def __load_properties(self, input_model):
+		self.E0 = input_model["Elements"]["Spring"]["E"]
+		self.nu0 = input_model["Elements"]["Spring"]["nu"]
 
 	def compute_strains(self):
 		self.eps = []
