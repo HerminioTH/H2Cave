@@ -72,6 +72,24 @@
             "save_damage_avg": true,
             "save_damage_vtk": true,
             "damage_name": "damage_field"
+        },
+        "ViscoplasticDesai": {
+            "F_0": 1.0,
+            "mu_1": 4e-11,
+            "N_1": 1.0,
+            "n": 3,
+            "a_1": 0.00195,
+            "eta": 0.65,
+            "beta_1": 0.0012,
+            "beta": -0.995,
+            "m": -0.5,
+            "gamma": 0.2325,
+            "alpha_0": 0.009,
+            "k_v": 0.275,
+            "sigma_t": 5.4,
+            "save_strain_avg": true,
+            "save_strain_vtk": true,
+            "strain_name": "eps_vp"
         }
     }
 }

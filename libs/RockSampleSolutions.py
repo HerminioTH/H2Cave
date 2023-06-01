@@ -294,9 +294,9 @@ class Damage(BaseSolution):
 
 
 class ViscoPlastic_Desai(BaseSolution):
-	def __init__(self, settings):
-		super().__init__(settings)
-		self.__load_properties(settings)
+	def __init__(self, input_model, input_bc):
+		super().__init__(input_bc)
+		self.__load_properties(input_model)
 		self.__initialize_variables()
 		self.__initialize_potential_function()
 		self.qsi = 0.0
@@ -386,48 +386,26 @@ class ViscoPlastic_Desai(BaseSolution):
 		self.alpha_q = self.alpha + self.k_v*(self.alpha_0 - self.alpha)*(1 - self.qsi_v/self.qsi)
 
 	def __compute_strain_rate(self, stress_MPa):
-		self.__compute_F0(stress_MPa)
 		n_flow = self.evaluate_flow_direction(stress_MPa, self.alpha_q)
 		# print(n_flow)
 		lmbda = self.mu_1*(self.Fvp/self.F0)**self.N_1
 		strain_rate = lmbda*n_flow
 		return strain_rate
 
-	def __compute_F0(self, stress_MPa):
-		# I1, I2, I3 = self.__compute_stress_invariants(*stress_MPa)
-		# J1, J2, J3 = self.__compute_deviatoric_invariants(I1, I2, I3)
-		# cos3theta = -(J3*np.sqrt(27))/(2*J2**1.5)
-		# print("cos3theta: ", cos3theta)
-		# print("alpha: ", self.alpha)
-		# print("I1: ", I1)
-		# print("gamma: ", self.gamma)
-		# print("beta_1: ", self.beta_1)
-		# print("beta: ", self.beta)
-		# print(np.exp(self.beta_1*self.sigma_t))
-		# print(np.exp(self.beta*cos3theta))
-		# print(np.exp(self.beta_1*self.sigma_t) - self.beta*cos3theta)
-		# F1 = (self.gamma*self.sigma_t**2 - self.alpha*self.sigma_t**self.n)
-		# F2 = (np.exp(self.beta_1*self.sigma_t) - self.beta*cos3theta)**self.m
-		# self.F0 = F1*F2
-		# print("F0: ", self.F0)
-		# print("F1: ", F1)
-		# print("F2: ", F2)
-		pass
-
-	def __load_properties(self, settings):
-		self.mu_1 = settings["viscoplastic"]["mu_1"]
-		self.N_1 = settings["viscoplastic"]["N_1"]
-		self.n = settings["viscoplastic"]["n"]
-		self.a_1 = settings["viscoplastic"]["a_1"]
-		self.eta = settings["viscoplastic"]["eta"]
-		self.beta_1 = settings["viscoplastic"]["beta_1"]
-		self.beta = settings["viscoplastic"]["beta"]
-		self.m = settings["viscoplastic"]["m"]
-		self.gamma = settings["viscoplastic"]["gamma"]
-		self.k_v = settings["viscoplastic"]["k_v"]
-		self.sigma_t = settings["viscoplastic"]["sigma_t"]
-		self.alpha_0 = settings["viscoplastic"]["alpha_0"]
-		self.F0 = settings["viscoplastic"]["F_0"]
+	def __load_properties(self, input_model):
+		self.mu_1 = input_model["Elements"]["ViscoplasticDesai"]["mu_1"]
+		self.N_1 = input_model["Elements"]["ViscoplasticDesai"]["N_1"]
+		self.n = input_model["Elements"]["ViscoplasticDesai"]["n"]
+		self.a_1 = input_model["Elements"]["ViscoplasticDesai"]["a_1"]
+		self.eta = input_model["Elements"]["ViscoplasticDesai"]["eta"]
+		self.beta_1 = input_model["Elements"]["ViscoplasticDesai"]["beta_1"]
+		self.beta = input_model["Elements"]["ViscoplasticDesai"]["beta"]
+		self.m = input_model["Elements"]["ViscoplasticDesai"]["m"]
+		self.gamma = input_model["Elements"]["ViscoplasticDesai"]["gamma"]
+		self.k_v = input_model["Elements"]["ViscoplasticDesai"]["k_v"]
+		self.sigma_t = input_model["Elements"]["ViscoplasticDesai"]["sigma_t"]
+		self.alpha_0 = input_model["Elements"]["ViscoplasticDesai"]["alpha_0"]
+		self.F0 = input_model["Elements"]["ViscoplasticDesai"]["F_0"]
 
 	def __initialize_variables(self):
 		self.alpha = self.alpha_0
