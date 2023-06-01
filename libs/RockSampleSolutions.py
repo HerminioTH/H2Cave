@@ -119,17 +119,17 @@ class Elastic(BaseSolution):
 
 
 class ViscoElastic(BaseSolution):
-	def __init__(self, settings):
-		super().__init__(settings)
-		self.__load_properties(settings)
+	def __init__(self, input_model, input_bc):
+		super().__init__(input_bc)
+		self.__load_properties(input_model)
 		self.build_stress_increments()
 		self.build_matrix(self.E0, self.nu0)
 
-	def __load_properties(self, settings):
-		self.E0 = settings["elasticity"]["E"]
-		self.nu0 = settings["elasticity"]["nu"]
-		self.voigt_E = np.array(settings["viscoelasticity"]["E"])
-		self.voigt_eta = np.array(settings["viscoelasticity"]["eta"])
+	def __load_properties(self, input_model):
+		self.E0 = input_model["Elements"]["Spring"]["E"]
+		self.nu0 = input_model["Elements"]["Spring"]["nu"]
+		self.voigt_E = np.array([input_model["Elements"]["KelvinVoigt"]["E"]])
+		self.voigt_eta = np.array([input_model["Elements"]["KelvinVoigt"]["eta"]])
 
 	def A(self, t):
 		try:
@@ -224,9 +224,9 @@ class DislocationCreep(BaseSolution):
 
 
 class Damage(BaseSolution):
-	def __init__(self, settings):
-		super().__init__(settings)
-		self.__load_properties(settings)
+	def __init__(self, input_model, input_bc):
+		super().__init__(input_bc)
+		self.__load_properties(input_model)
 
 		self.eps_d = np.zeros((3,3))
 		self.eps_d_old = np.zeros((3,3))
@@ -234,14 +234,14 @@ class Damage(BaseSolution):
 		self.eps = [self.eps_d]
 		self.D_list = [0.0]
 
-	def __load_properties(self, settings):
-		self.A = settings["damage"]["A"]
-		self.B = settings["damage"]["B"]
-		self.n = settings["damage"]["n"]
-		self.r = settings["damage"]["r"]
-		self.E = settings["elasticity"]["E"]
-		self.nu = settings["elasticity"]["nu"]
-		self.G = self.E/(2*(1+self.nu))
+	def __load_properties(self, input_model):
+		self.A = input_model["Elements"]["Damage"]["A"]
+		self.B = input_model["Elements"]["Damage"]["B"]
+		self.n = input_model["Elements"]["Damage"]["n"]
+		self.r = input_model["Elements"]["Damage"]["r"]
+		self.nu = input_model["Elements"]["Damage"]["nu0"]
+		# self.E = input_model["Elements"]["elasticity"]["E"]
+		# self.G = self.E/(2*(1+self.nu))
 
 	def update_internal_variables(self):
 		self.eps_d_old = self.eps_d
