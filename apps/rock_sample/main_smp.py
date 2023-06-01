@@ -52,21 +52,21 @@ def main():
 
 	# Initialize models
 	model_e = Elastic(input_model, input_bc)
-	model_cr = Creep(input_model, input_bc)
+	model_cr = DislocationCreep(input_model, input_bc)
 	# model_ve = ViscoElastic(settings)
 	# model_d = Damage(settings)
 	# model_vp = ViscoPlastic_Desai(settings)
 
 	# Compute strains
 	model_e.compute_strains()
-	# model_cr.compute_strains()
+	model_cr.compute_strains()
 	# model_ve.compute_strains()
 	# model_d.compute_strains()
 	# model_vp.compute_strains()
 
 	# Compute total strains
 	eps_tot = model_e.eps.copy()
-	# eps_tot += model_cr.eps.copy()
+	eps_tot += model_cr.eps.copy()
 	# eps_tot += model_ve.eps.copy()
 	# eps_tot += model_d.eps.copy()
 	# eps_tot += model_vp.eps.copy()
@@ -78,8 +78,8 @@ def main():
 	# saver_eps_ve = TensorSaver(output_folder, "eps_ve")
 	# saver_eps_ve.save_results(model_ve.time_list, model_ve.eps)
 
-	# saver_eps_cr = TensorSaver(output_folder, "eps_cr")
-	# saver_eps_cr.save_results(model_cr.time_list, model_cr.eps)
+	saver_eps_cr = TensorSaver(output_folder, "eps_cr")
+	saver_eps_cr.save_results(model_cr.time_list, model_cr.eps)
 
 	# saver_eps_d = TensorSaver(output_folder, "eps_d")
 	# saver_eps_d.save_results(model_d.time_list, model_d.eps)

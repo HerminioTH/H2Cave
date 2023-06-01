@@ -179,19 +179,19 @@ class ViscoElastic(BaseSolution):
 	# 		self.eps.append(eps_value)
 	# 	self.eps = np.array(self.eps)
 
-class Creep(BaseSolution):
-	def __init__(self, settings):
-		super().__init__(settings)
-		self.__load_properties(settings)
+class DislocationCreep(BaseSolution):
+	def __init__(self, input_model, input_bc):
+		super().__init__(input_bc)
+		self.__load_properties(input_model)
 
 		self.eps_cr = np.zeros((3,3))
 		self.eps_cr_old = np.zeros((3,3))
 		self.eps_cr_rate = np.zeros((3,3))
 
-	def __load_properties(self, settings):
-		self.A = settings["creep"]["A"]
-		self.n = settings["creep"]["n"]
-		self.T = settings["creep"]["T"]
+	def __load_properties(self, input_model):
+		self.A = input_model["Elements"]["DislocationCreep"]["A"]
+		self.n = input_model["Elements"]["DislocationCreep"]["n"]
+		self.T = input_model["Elements"]["DislocationCreep"]["T"]
 		self.R = 8.32		# Universal gas constant
 		self.Q = 51600  	# Creep activation energy, [J/mol]
 		self.B = self.A*np.exp(-self.Q/(self.R*self.T))
