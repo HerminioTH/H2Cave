@@ -1,11 +1,8 @@
 import os
 import sys
-import numpy as np
-import time
-import shutil
 sys.path.append(os.path.join("..", "..", "libs"))
 from Simulators import H2CaveSimulator
-from Utils import *
+from Utils import read_json
 
 def main():
 	# Read input_model

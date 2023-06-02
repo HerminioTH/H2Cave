@@ -1,10 +1,8 @@
 import os
 import sys
 sys.path.append(os.path.join("..", "..", "libs"))
-# from RockSampleSolutions import *
 from Simulators import SmpSimulator
-from Utils import read_json, save_json, hour, MPa
-import time
+from Utils import read_json
 
 def main():
 	# Read input_model
