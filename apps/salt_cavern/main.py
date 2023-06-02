@@ -37,76 +37,67 @@ def pressure(t_list):
 		p_list.append(p)
 	return p_list
 
-
-
-def write_settings(settings):
+def write_settings(input_bc):
 	# Define time levels
 	n_steps = 75
 	t_f = 5*day
 	time_list = list(np.linspace(0, t_f, n_steps))
-	settings["Time"]["timeList"] = time_list
+	input_bc["Time"]["timeList"] = time_list
 
 	# Define boundary conditions
-	settings["BoundaryConditions"]["u_x"]["SIDE_X"]["type"] = "DIRICHLET"
-	settings["BoundaryConditions"]["u_x"]["SIDE_X"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_x"]["SIDE_Y"]["type"] = "NEUMANN"
-	settings["BoundaryConditions"]["u_x"]["SIDE_Y"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_x"]["OUTER"]["type"] = "DIRICHLET"
-	settings["BoundaryConditions"]["u_x"]["OUTER"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_x"]["BOTTOM"]["type"] = "NEUMANN"
-	settings["BoundaryConditions"]["u_x"]["BOTTOM"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_x"]["TOP"]["type"] = "NEUMANN"
-	settings["BoundaryConditions"]["u_x"]["TOP"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_x"]["WALL"]["type"] = "NEUMANN"
-	settings["BoundaryConditions"]["u_x"]["WALL"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_x"]["SIDE_X"]["type"] = "DIRICHLET"
+	input_bc["BoundaryConditions"]["u_x"]["SIDE_X"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_x"]["SIDE_Y"]["type"] = "NEUMANN"
+	input_bc["BoundaryConditions"]["u_x"]["SIDE_Y"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_x"]["OUTER"]["type"] = "DIRICHLET"
+	input_bc["BoundaryConditions"]["u_x"]["OUTER"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_x"]["BOTTOM"]["type"] = "NEUMANN"
+	input_bc["BoundaryConditions"]["u_x"]["BOTTOM"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_x"]["TOP"]["type"] = "NEUMANN"
+	input_bc["BoundaryConditions"]["u_x"]["TOP"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_x"]["WALL"]["type"] = "NEUMANN"
+	input_bc["BoundaryConditions"]["u_x"]["WALL"]["value"] = list(np.repeat(0.0, len(time_list)))
 
-	settings["BoundaryConditions"]["u_y"]["SIDE_X"]["type"] = "NEUMANN"
-	settings["BoundaryConditions"]["u_y"]["SIDE_X"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_y"]["SIDE_Y"]["type"] = "DIRICHLET"
-	settings["BoundaryConditions"]["u_y"]["SIDE_Y"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_y"]["OUTER"]["type"] = "DIRICHLET"
-	settings["BoundaryConditions"]["u_y"]["OUTER"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_y"]["BOTTOM"]["type"] = "NEUMANN"
-	settings["BoundaryConditions"]["u_y"]["BOTTOM"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_y"]["TOP"]["type"] = "NEUMANN"
-	settings["BoundaryConditions"]["u_y"]["TOP"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_y"]["WALL"]["type"] = "NEUMANN"
-	settings["BoundaryConditions"]["u_y"]["WALL"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_y"]["SIDE_X"]["type"] = "NEUMANN"
+	input_bc["BoundaryConditions"]["u_y"]["SIDE_X"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_y"]["SIDE_Y"]["type"] = "DIRICHLET"
+	input_bc["BoundaryConditions"]["u_y"]["SIDE_Y"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_y"]["OUTER"]["type"] = "DIRICHLET"
+	input_bc["BoundaryConditions"]["u_y"]["OUTER"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_y"]["BOTTOM"]["type"] = "NEUMANN"
+	input_bc["BoundaryConditions"]["u_y"]["BOTTOM"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_y"]["TOP"]["type"] = "NEUMANN"
+	input_bc["BoundaryConditions"]["u_y"]["TOP"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_y"]["WALL"]["type"] = "NEUMANN"
+	input_bc["BoundaryConditions"]["u_y"]["WALL"]["value"] = list(np.repeat(0.0, len(time_list)))
 
-	settings["BoundaryConditions"]["u_z"]["SIDE_X"]["type"] = "NEUMANN"
-	settings["BoundaryConditions"]["u_z"]["SIDE_X"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_z"]["SIDE_Y"]["type"] = "NEUMANN"
-	settings["BoundaryConditions"]["u_z"]["SIDE_Y"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_z"]["OUTER"]["type"] = "NEUMANN"
-	settings["BoundaryConditions"]["u_z"]["OUTER"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_z"]["BOTTOM"]["type"] = "DIRICHLET"
-	settings["BoundaryConditions"]["u_z"]["BOTTOM"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_z"]["TOP"]["type"] = "NEUMANN"
-	settings["BoundaryConditions"]["u_z"]["TOP"]["value"] = list(np.repeat(0.0, len(time_list)))
-	settings["BoundaryConditions"]["u_z"]["WALL"]["type"] = "NEUMANN"
-	settings["BoundaryConditions"]["u_z"]["WALL"]["value"] = pressure(time_list)
+	input_bc["BoundaryConditions"]["u_z"]["SIDE_X"]["type"] = "NEUMANN"
+	input_bc["BoundaryConditions"]["u_z"]["SIDE_X"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_z"]["SIDE_Y"]["type"] = "NEUMANN"
+	input_bc["BoundaryConditions"]["u_z"]["SIDE_Y"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_z"]["OUTER"]["type"] = "NEUMANN"
+	input_bc["BoundaryConditions"]["u_z"]["OUTER"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_z"]["BOTTOM"]["type"] = "DIRICHLET"
+	input_bc["BoundaryConditions"]["u_z"]["BOTTOM"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_z"]["TOP"]["type"] = "NEUMANN"
+	input_bc["BoundaryConditions"]["u_z"]["TOP"]["value"] = list(np.repeat(0.0, len(time_list)))
+	input_bc["BoundaryConditions"]["u_z"]["WALL"]["type"] = "NEUMANN"
+	input_bc["BoundaryConditions"]["u_z"]["WALL"]["value"] = pressure(time_list)
 
-	# Create a name using the elements of the model
-	name = settings["Model"][0]
-	for elem in settings["Model"][1:]:
-		name += f"_{elem}"
-	settings["Paths"]["Output"] = os.path.join(*settings["Paths"]["Output"].split("/"), name)
-
-	# # Dump to file
-	# save_json(settings, "settings.json")
-
-	return settings
+	return input_bc
 
 
 def main():
-	# Read settings
-	settings = read_json("settings.json")
+	# Read input_model
+	input_model = read_json("input_model.json")
 
-	# Write settings
-	settings = write_settings(settings)
+	# Read input_bc
+	input_bc = read_json("input_bc_fem.json")
+	# input_bc = write_settings(input_bc)
+	# save_json(input_bc, "input_bc_fem.json")
 
 	# Build simulation and run
-	H2CaveSimulator(settings)
+	H2CaveSimulator(input_model, input_bc)
 
 
 if __name__ == "__main__":
