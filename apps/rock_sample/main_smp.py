@@ -1,8 +1,4 @@
-import numpy as np
-import pandas as pd
-import json
 import os
-import stat
 import sys
 sys.path.append(os.path.join("..", "..", "libs"))
 # from RockSampleSolutions import *
@@ -13,6 +9,10 @@ import time
 def main():
 	# Read input_model
 	input_model = read_json("input_model.json")
+
+	# Change output folder name (just add "smp" folder)
+	output_folder = input_model["Paths"]["Output"]
+	input_model["Paths"]["Output"] = os.path.join(output_folder, "smp")
 
 	# Read input_bc
 	input_bc = read_json("input_bc_smp.json")
