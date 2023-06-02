@@ -6,7 +6,9 @@
     "Model": [
         "Spring",
         "KelvinVoigt",
-        "DislocationCreep"
+        "DislocationCreep",
+        "Damage",
+        "ViscoplasticDesai"
     ],
     "Element_names (this is not read by the program)": [
         "Spring",
@@ -14,18 +16,22 @@
         "Dashpot",
         "DislocationCreep",
         "Damage",
-        "PressureSolutionCreep"
+        "PressureSolutionCreep",
+        "ViscoplasticDesai"
     ],
     "Elements": {
         "Spring": {
             "E": 2800000000.0,
             "nu": 0.3,
+            "save_strain_smp": true,
             "save_strain_avg": true,
             "save_strain_vtk": true,
             "strain_name": "eps_e",
+            "save_stress_smp": false,
             "save_stress_avg": true,
             "save_stress_vtk": true,
             "stress_name": "stress",
+            "save_total_strain_smp": true,
             "save_total_strain_avg": true,
             "save_total_strain_vtk": true,
             "total_strain_name": "eps_tot"
@@ -34,12 +40,14 @@
             "E": 1030000000.0,
             "nu": 0.3,
             "eta": 450000000000000.0,
+            "save_strain_smp": true,
             "save_strain_avg": true,
             "save_strain_vtk": true,
             "strain_name": "eps_ve"
         },
         "Dashpot": {
             "eta": 2000000000000000.0,
+            "save_strain_smp": true,
             "save_strain_avg": true,
             "save_strain_vtk": true,
             "strain_name": "eps_dashpot"
@@ -48,6 +56,7 @@
             "A": 1.5e-36,
             "n": 5.0,
             "T": 298,
+            "save_strain_smp": true,
             "save_strain_avg": true,
             "save_strain_vtk": true,
             "strain_name": "eps_cr_dis"
@@ -56,6 +65,7 @@
             "A": 8e-27,
             "d": 0.005,
             "n": 1.0,
+            "save_strain_smp": true,
             "save_strain_avg": true,
             "save_strain_vtk": true,
             "strain_name": "eps_cr_sol"
@@ -66,9 +76,11 @@
             "nu0": 0.3,
             "n": 5,
             "r": 2.48,
+            "save_strain_smp": true,
             "save_strain_avg": true,
             "save_strain_vtk": true,
             "strain_name": "eps_damage",
+            "save_damage_smp": true,
             "save_damage_avg": true,
             "save_damage_vtk": true,
             "damage_name": "damage_field"
@@ -87,6 +99,7 @@
             "alpha_0": 0.009,
             "k_v": 0.275,
             "sigma_t": 5.4,
+            "save_strain_smp": true,
             "save_strain_avg": true,
             "save_strain_vtk": true,
             "strain_name": "eps_vp"
