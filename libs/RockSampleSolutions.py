@@ -64,8 +64,8 @@ class BaseSolution():
 		self.__load_time_list(input_bc)
 		self.__build_sigmas(input_bc)
 
-	def __load_time_list(self, input_model):
-		self.time_list = np.array(input_model["Time"]["timeList"])
+	def __load_time_list(self, input_bc):
+		self.time_list = np.array(input_bc["Time"]["timeList"])
 
 	def __build_sigmas(self, input_bc):
 		n = len(input_bc["sigma_xx"])
@@ -118,7 +118,7 @@ class Elastic(BaseSolution):
 		self.eps = np.array(self.eps)
 
 
-class ViscoElastic(BaseSolution):
+class Viscoelastic(BaseSolution):
 	def __init__(self, input_model, input_bc):
 		super().__init__(input_bc)
 		self.__load_properties(input_model)
@@ -140,10 +140,6 @@ class ViscoElastic(BaseSolution):
 			value += (1 - np.exp(-E*t/eta))*self.E0/E
 		return value
 
-		# for i in range(len(self.voigt_E)):
-		# 	value = (1 - np.exp(-self.voigt_E*t/self.voigt_eta))*self.E0/self.voigt_E
-		# return sum(value)
-
 	def compute_strains(self):
 		self.eps = []
 		shape = self.d_sigmas[0].shape
@@ -157,27 +153,6 @@ class ViscoElastic(BaseSolution):
 			eps_value += voigt2tensor(np.dot(self.D, soma))
 			self.eps.append(eps_value)
 		self.eps = np.array(self.eps)
-
-	# def compute_strains(self):
-	# 	self.eps = []
-	# 	shape = self.d_sigmas[0].shape
-	# 	for i in range(len(self.time_list)):
-	# 		soma = np.zeros(shape)
-	# 		for j in range(i-1):
-	# 			soma += self.A(self.time_list[i] - self.time_list[j])*self.d_sigmas[j+1]
-	# 		eps_value = self.A(self.time_list[i])*voigt2tensor(np.dot(self.D, self.sigma_0))
-	# 		eps_value += voigt2tensor(np.dot(self.D, soma))
-	# 		self.eps.append(eps_value)
-	# 	self.eps = np.array(self.eps)
-
-	# def compute_strains(self):
-	# 	self.eps = []
-	# 	for i in range(len(self.time_list)):
-	# 		eps_value = self.A(self.time_list[i])*voigt2tensor(np.dot(self.D, self.sigma_0))
-	# 		for j in range(i-1):
-	# 			eps_value += self.A(self.time_list[i] - self.time_list[j])*voigt2tensor(np.dot(self.D, self.d_sigmas[j+1]))
-	# 		self.eps.append(eps_value)
-	# 	self.eps = np.array(self.eps)
 
 class DislocationCreep(BaseSolution):
 	def __init__(self, input_model, input_bc):
@@ -293,7 +268,7 @@ class Damage(BaseSolution):
 
 
 
-class ViscoPlastic_Desai(BaseSolution):
+class ViscoplasticDesai(BaseSolution):
 	def __init__(self, input_model, input_bc):
 		super().__init__(input_bc)
 		self.__load_properties(input_model)
@@ -348,8 +323,8 @@ class ViscoPlastic_Desai(BaseSolution):
 					if ite >= maxiter:
 						print(f"Maximum number of iterations ({maxiter}) reached.")
 
-				string = (i, self.Fvp, strain_rate[0,0], strain_rate[1,1], strain_rate[2,2], (strain_rate[0,1]+strain_rate[0,2]+strain_rate[1,2]))
-				print("%i | %.4e | %.4e | %.4e | %.4e | %.4e"%string)
+				# string = (i, self.Fvp, strain_rate[0,0], strain_rate[1,1], strain_rate[2,2], (strain_rate[0,1]+strain_rate[0,2]+strain_rate[1,2]))
+				# print("%i | %.4e | %.4e | %.4e | %.4e | %.4e"%string)
 				# print(i, strain_rate[0,0], strain_rate[1,1], strain_rate[2,2], (strain_rate[0,1]+strain_rate[0,2]+strain_rate[1,2]))
 
 				self.qsi_old = self.qsi
