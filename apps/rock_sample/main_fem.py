@@ -24,6 +24,7 @@ def write_settings(settings):
 	for elem in settings["Model"][1:]:
 		name += f"_{elem}"
 	settings["Paths"]["Output"] = os.path.join(*settings["Paths"]["Output"].split("/"), name)
+	print(f"Output folder: {settings["Paths"]["Output"]}")
 
 	# # Dump to file
 	return settings

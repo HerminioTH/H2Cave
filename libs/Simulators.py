@@ -155,8 +155,8 @@ def H2CaveSimulator(settings):
 		model.add_inelastic_element(ELEMENT_DICT[element_name](fem_handler, settings, element_name=element_name))
 
 	# Build simulator
-	sim = Simulator(time_handler)
-
+	sim = Simulator(time_handler
+)
 	# Add models
 	sim.add_model(model)
 
@@ -250,3 +250,62 @@ def H2CaveSimulator(settings):
 	shutil.copy(os.path.join(grid_folder, "geom.msh"), os.path.join(output_folder, "vtk"))
 	# shutil.copy(__file__, os.path.join(output_folder, "copy.py"))
 	save_json(settings, os.path.join(output_folder, "settings.json"))
+
+
+
+
+def SmpSimulator(input_model, input_bc):
+	'''
+		This is a simulator for the Simplified Model, which has nothing to do with the Finite Elements.
+	'''
+	from RockSampleSolutions import Elastic, Viscoelastic, DislocationCreep, Damage, ViscoplasticDesai, TensorSaver
+	from Utils import save_json
+	import os
+
+	# Output folder
+	output_folder = input_model["Paths"]["Output"]
+
+	# Build model
+	if "Spring" not in input_model["Model"]:
+		raise Exception("Model must have a Spring element.")
+	else:
+		model_elements = [Elastic(input_model, input_bc)]
+	if "KelvinVoigt" in input_model["Model"]:
+		model_elements.append(Viscoelastic(input_model, input_bc))
+	if "DislocationCreep" in input_model["Model"]:
+		model_elements.append(DislocationCreep(input_model, input_bc))
+	if "Damage" in input_model["Model"]:
+		model_elements.append(Damage(input_model, input_bc))
+	if "ViscoplasticDesai" in input_model["Model"]:
+		model_elements.append(ViscoplasticDesai(input_model, input_bc))
+
+	# Compute total strains
+	eps_tot = 0
+	for element in model_elements:
+		element.compute_strains()
+		eps_tot += element.eps.copy()
+
+	# Save fields
+	ELEMENT_DICT = {
+						Elastic : "Spring",
+						Viscoelastic : "KelvinVoigt",
+						DislocationCreep : "DislocationCreep",
+						Damage : "Damage",
+						ViscoplasticDesai : "ViscoplasticDesai"
+	}
+	for element in model_elements:
+		element_name = ELEMENT_DICT[type(element)]
+		if input_model["Elements"][element_name]["save_strain_smp"] == True:
+			strain_name = input_model["Elements"][element_name]["strain_name"]
+			saver_eps = TensorSaver(output_folder, strain_name)
+			saver_eps.save_results(element.time_list, element.eps)
+
+	# Save total strain
+	if input_model["Elements"]["Spring"]["save_total_strain_smp"] == True:
+		strain_name = input_model["Elements"]["Spring"]["total_strain_name"]
+		saver_eps = TensorSaver(output_folder, strain_name)
+		saver_eps.save_results(element.time_list, element.eps)
+
+	# Save settings
+	save_json(input_bc, os.path.join(output_folder, "input_bc_smp.json"))
+	save_json(input_model, os.path.join(output_folder, "input_model.json"))

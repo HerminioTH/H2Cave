@@ -5,111 +5,51 @@ import os
 import stat
 import sys
 sys.path.append(os.path.join("..", "..", "libs"))
-from RockSampleSolutions import *
+# from RockSampleSolutions import *
+from Simulators import SmpSimulator
+from Utils import read_json, save_json, hour, MPa
 import time
 
-def read_json(file_name):
-	with open(file_name, "r") as j_file:
-		data = json.load(j_file)
-	return data
-
-def save_json(data, file_name):
-	# os.chmod(file_name, stat.S_IRWXU)
-	with open(file_name, "w") as f:
-	    json.dump(data, f, indent=4)
-
-def write_stresses():
-	# Read settings
-	settings = read_json("settings.json")
-
+def write_input_bc(input_bc):
 	# Define time levels
-	n_steps = 5
+	n_steps = 100
 	time = np.linspace(0.0, 2716*hour, n_steps)
-	settings["Time"]["timeList"] = list(time)
+	input_bc["Time"]["timeList"] = list(time)
 
 	# Define stress tensors
-	settings["sigma_zz"] = list(np.repeat(18.7*MPa, n_steps))
-	settings["sigma_xx"] = list(np.repeat(0.0, n_steps))
-	settings["sigma_yy"] = list(np.repeat(0.0, n_steps))
-	settings["sigma_xy"] = list(np.repeat(0.0, n_steps))
-	settings["sigma_yz"] = list(np.repeat(0.0, n_steps))
-	settings["sigma_xz"] = list(np.repeat(0.0, n_steps))
+	input_bc["sigma_xx"] = list(np.repeat(0.0, n_steps))
+	input_bc["sigma_xy"] = list(np.repeat(0.0, n_steps))
+	input_bc["sigma_xz"] = list(np.repeat(0.0, n_steps))
+	input_bc["sigma_yy"] = list(np.repeat(0.0, n_steps))
+	input_bc["sigma_yz"] = list(np.repeat(0.0, n_steps))
+	input_bc["sigma_zz"] = list(np.repeat(-18.7*MPa, n_steps))
+	return input_bc
 
-	# # Dump to file
-	# save_json(settings, "settings.json")
+def write_output_folder(input_model):
+	'''
+		This function is totally optional, meaning that it can be removed without compromising the simulation.
+		Its only purpose is to write the name of the output folder by combining the name of the elements composing the model.
+	'''
+	# Define output folder
+	name = input_model["Model"][0]
+	for elem in input_model["Model"][1:]:
+		name += f"_{elem}"
+	input_model["Paths"]["Output"] = os.path.join(*input_model["Paths"]["Output"].split("/"), "smp", name)
+	output_folder = os.path.join(input_model["Paths"]["Output"])
+	print(f"Output folder: {output_folder}")
+	return input_model
 
 def main():
-
-	# Write stresses, if necessary
-	# write_stresses()
-
-	# Read settings
+	# Read input_model
 	input_model = read_json("input_model.json")
+	input_model = write_output_folder(input_model)
+
+	# Read input_bc
 	input_bc = read_json("input_bc_smp.json")
+	input_bc = write_input_bc(input_bc)
 
-	# Deine output folder
-	output_folder = os.path.join(input_model["Paths"]["Output"], "smp")
-
-	# Initialize models
-	model_e = Elastic(input_model, input_bc)
-	model_ve = ViscoElastic(input_model, input_bc)
-	model_cr = DislocationCreep(input_model, input_bc)
-	model_d = Damage(input_model, input_bc)
-	model_vp = ViscoPlastic_Desai(input_model, input_bc)
-
-	# Compute strains
-	model_e.compute_strains()
-	model_ve.compute_strains()
-	model_cr.compute_strains()
-	model_d.compute_strains()
-	model_vp.compute_strains()
-
-	# Compute total strains
-	eps_tot = model_e.eps.copy()
-	eps_tot += model_ve.eps.copy()
-	eps_tot += model_cr.eps.copy()
-	eps_tot += model_d.eps.copy()
-	eps_tot += model_vp.eps.copy()
-
-	# Save results
-	saver_eps_e = TensorSaver(output_folder, "eps_e")
-	saver_eps_e.save_results(model_e.time_list, model_e.eps)
-
-	saver_eps_ve = TensorSaver(output_folder, "eps_ve")
-	saver_eps_ve.save_results(model_ve.time_list, model_ve.eps)
-
-	saver_eps_cr = TensorSaver(output_folder, "eps_cr")
-	saver_eps_cr.save_results(model_cr.time_list, model_cr.eps)
-
-	saver_eps_d = TensorSaver(output_folder, "eps_d")
-	saver_eps_d.save_results(model_d.time_list, model_d.eps)
-
-	saver_eps_vp = TensorSaver(output_folder, "eps_vp")
-	saver_eps_vp.save_results(model_vp.time_list, model_vp.eps)
-
-	saver_eps_tot = TensorSaver(output_folder, "eps_tot")
-	saver_eps_tot.save_results(model_e.time_list, eps_tot)
-
-	# Save stresses
-	stresses = [voigt2tensor(model_e.sigmas[i]) for i in range(len(model_e.time_list))]
-	saver_stresses = TensorSaver(output_folder, "stresses")
-	saver_stresses.save_results(model_e.time_list, stresses)
-
-	'''
-	# # Save alphas for viscoplasticity
-	# saver_alpha = TensorSaver(output_folder, "alpha")
-	# alphas = np.zeros(model_e.eps.shape)
-	# alphas[:,0,0] = model_vp.alphas
-	# saver_alpha.save_results(model_vp.time_list, alphas)
-
-	# saver_alpha_q = TensorSaver(output_folder, "alpha_q")
-	# alpha_qs = np.zeros(model_e.eps.shape)
-	# alpha_qs[:,0,0] = model_vp.alpha_qs
-	# saver_alpha_q.save_results(model_vp.time_list, alpha_qs)
-
-	# # Save settings
-	# save_json(settings, os.path.join(output_folder, "settings.json"))
-	'''
+	# Run simulator
+	SmpSimulator(input_model, input_bc)
 
 
 if __name__ == '__main__':
