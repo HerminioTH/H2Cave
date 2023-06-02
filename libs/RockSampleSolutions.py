@@ -197,6 +197,45 @@ class DislocationCreep(BaseSolution):
 		self.eps = np.array(self.eps)
 
 
+class PressureSolutionCreep(BaseSolution):
+	def __init__(self, input_model, input_bc):
+		super().__init__(input_bc)
+		self.__load_properties(input_model)
+
+		self.eps_cr = np.zeros((3,3))
+		self.eps_cr_old = np.zeros((3,3))
+		self.eps_cr_rate = np.zeros((3,3))
+
+	def __load_properties(self, input_model):
+		self.A = input_model["Elements"]["PressureSolutionCreep"]["A"]
+		self.n = input_model["Elements"]["PressureSolutionCreep"]["n"]
+		self.d = input_model["Elements"]["PressureSolutionCreep"]["d"]
+		self.B = float(self.A)/(self.d**self.n)
+
+	def update_internal_variables(self):
+		self.eps_cr_old = self.eps_cr
+		self.eps_cr_rate_old = self.eps_cr_rate
+
+	def compute_eps_cr_rate(self, sigma):
+		stress = voigt2tensor(sigma)
+		s = stress - (1./3)*trace(stress)*np.eye(3)
+		self.eps_cr_rate = self.B*s
+
+	def compute_eps_cr(self, i):
+		t = self.time_list[i]
+		t_old = self.time_list[i-1]
+		dt = t - t_old
+		self.compute_eps_cr_rate(self.sigmas[i])
+		self.eps_cr = self.eps_cr_old + self.eps_cr_rate*dt
+		self.eps_cr_old = self.eps_cr
+
+	def compute_strains(self):
+		self.eps = [self.eps_cr]
+		for i in range(1, len(self.time_list)):
+			self.compute_eps_cr(i)
+			self.eps.append(self.eps_cr)
+		self.eps = np.array(self.eps)
+
 
 class Damage(BaseSolution):
 	def __init__(self, input_model, input_bc):
@@ -243,10 +282,6 @@ class Damage(BaseSolution):
 
 		# Compute damage
 		D = 1 - (1 - t*(1+self.r)*(sigma_star/self.B)**self.r)**(1/(1+self.r))
-		# if i == 1:
-		# 	print((t*(1+self.r)*(sigma_m/von_Mises)**self.r)**(1/(1+self.r)))
-		# print(i, t*(1+self.r)*(sigma_star/self.B)**self.r)
-		# print(i, D)
 
 		# Save damage
 		self.D_list.append(D)

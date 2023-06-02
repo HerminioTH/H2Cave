@@ -7,8 +7,8 @@
         "Spring",
         "KelvinVoigt",
         "DislocationCreep",
-        "Damage",
-        "ViscoplasticDesai"
+        "PressureSolutionCreep",
+        "Damage"
     ],
     "Element_names (this is not read by the program)": [
         "Spring",

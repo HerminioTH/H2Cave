@@ -258,7 +258,7 @@ def SmpSimulator(input_model, input_bc):
 	'''
 		This is a simulator for the Simplified Model, which has nothing to do with the Finite Elements.
 	'''
-	from RockSampleSolutions import Elastic, Viscoelastic, DislocationCreep, Damage, ViscoplasticDesai, TensorSaver
+	from RockSampleSolutions import Elastic, Viscoelastic, DislocationCreep, PressureSolutionCreep, Damage, ViscoplasticDesai, TensorSaver
 	from Utils import save_json
 	import os
 
@@ -274,12 +274,14 @@ def SmpSimulator(input_model, input_bc):
 		model_elements.append(Viscoelastic(input_model, input_bc))
 	if "DislocationCreep" in input_model["Model"]:
 		model_elements.append(DislocationCreep(input_model, input_bc))
+	if "PressureSolutionCreep" in input_model["Model"]:
+		model_elements.append(PressureSolutionCreep(input_model, input_bc))
 	if "Damage" in input_model["Model"]:
 		model_elements.append(Damage(input_model, input_bc))
 	if "ViscoplasticDesai" in input_model["Model"]:
 		model_elements.append(ViscoplasticDesai(input_model, input_bc))
 
-	# Compute total strains
+	# Compute total strain
 	eps_tot = 0
 	for element in model_elements:
 		element.compute_strains()
@@ -290,6 +292,7 @@ def SmpSimulator(input_model, input_bc):
 						Elastic : "Spring",
 						Viscoelastic : "KelvinVoigt",
 						DislocationCreep : "DislocationCreep",
+						PressureSolutionCreep : "PressureSolutionCreep",
 						Damage : "Damage",
 						ViscoplasticDesai : "ViscoplasticDesai"
 	}
@@ -304,7 +307,7 @@ def SmpSimulator(input_model, input_bc):
 	if input_model["Elements"]["Spring"]["save_total_strain_smp"] == True:
 		strain_name = input_model["Elements"]["Spring"]["total_strain_name"]
 		saver_eps = TensorSaver(output_folder, strain_name)
-		saver_eps.save_results(element.time_list, element.eps)
+		saver_eps.save_results(model_elements[0].time_list, eps_tot)
 
 	# Save settings
 	save_json(input_bc, os.path.join(output_folder, "input_bc_smp.json"))
