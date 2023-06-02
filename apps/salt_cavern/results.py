@@ -135,7 +135,7 @@ def main():
 	fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 3))
 	fig.subplots_adjust(top=0.970, bottom=0.16, left=0.114, right=0.98, hspace=0.21, wspace=0.340)
 
-	output_folder = os.path.join("output", "case_0", "Spring_KelvinVoigt_DislocationCreep_Damage", "vtk")
+	output_folder = os.path.join("output", "case_0", "vtk")
 	plot_res(ax1, ax2, output_folder, "steelblue", "Final shape", True)
 
 	# apply_dark_theme(fig, [ax1, ax2], transparent=False)

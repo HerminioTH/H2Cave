@@ -25,24 +25,6 @@ def apply_grey_theme(fig, axes, transparent=True):
 			ax.xaxis.label.set_color('black')
 			ax.set_facecolor("0.85")
 
-def apply_white_theme(fig, axes, transparent=True):
-	fig.patch.set_facecolor("#212121ff")
-	if transparent:
-		fig.patch.set_alpha(0.0)
-	for ax in axes:
-		if ax != None:
-			ax.grid(True, color='#c4c4c4ff')
-			ax.set_axisbelow(True)
-			ax.spines['bottom'].set_color('black')
-			ax.spines['top'].set_color('black')
-			ax.spines['right'].set_color('black')
-			ax.spines['left'].set_color('black')
-			ax.tick_params(axis='x', colors='black', which='both')
-			ax.tick_params(axis='y', colors='black', which='both')
-			ax.yaxis.label.set_color('black')
-			ax.xaxis.label.set_color('black')
-			ax.set_facecolor("#e9e9e9ff")
-
 def plot_model(axis, folder):
 	skip = 1
 	eps_files = ["eps_tot", "eps_e", "eps_ve", "eps_cr_dis", "eps_cr_sol", "eps_damage"]
@@ -73,19 +55,10 @@ def main():
 	fig, axis = plt.subplots(1, 2, figsize=(8, 3))
 	fig.subplots_adjust(top=0.975, bottom=0.155, left=0.085, right=0.875, hspace=0.2, wspace=0.32)
 
-	# model_name = "Spring"
-	# model_name = "Spring_KelvinVoigt"
-	# model_name = "Spring_Damage"
-	# model_name = "Spring_KelvinVoigt_Damage"
-	# model_name = "Spring_KelvinVoigt_DislocationCreep"
-	# model_name = "Spring_KelvinVoigt_DislocationCreep_Damage"
-	model_name = "Spring_KelvinVoigt_DislocationCreep_PressureSolutionCreep_Damage"
-	results_folder = os.path.join("output", "case_0", model_name, "avg")
-
+	results_folder = os.path.join("output", "case_0", "fem", "avg")
 	plot_model(axis, results_folder)
 	apply_grey_theme(fig, axis.flatten(), transparent=True)
 	plt.show()
 
 if __name__ == "__main__":
-	# main_0()
 	main()

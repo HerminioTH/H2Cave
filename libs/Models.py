@@ -8,10 +8,10 @@ import abc
 
 class BaseModel(metaclass=abc.ABCMeta):
 	@abc.abstractmethod
-	def __init__(self, fem_handler, bc_handler, settings):
+	def __init__(self, fem_handler, bc_handler, input_model):
 		self.fem_handler = fem_handler
 		self.bc_handler = bc_handler
-		self.settings = settings
+		self.input_model = input_model
 
 	@abc.abstractmethod
 	def initialize(self, time_handler):
@@ -34,8 +34,8 @@ class BaseModel(metaclass=abc.ABCMeta):
 	# 	pass", "m")
 
 class MechanicsModel(BaseModel):
-	def __init__(self, fem_handler, bc_handler, settings):
-		super().__init__(fem_handler, bc_handler, settings)
+	def __init__(self, fem_handler, bc_handler, input_model):
+		super().__init__(fem_handler, bc_handler, input_model)
 		self.__initialize_solution_vector()
 
 	def __initialize_solution_vector(self):
@@ -53,9 +53,9 @@ class MechanicsModel(BaseModel):
 		# self.u_k = self.u.vector().array()
 
 class ElasticModel(MechanicsModel):
-	def __init__(self, fem_handler, bc_handler, settings):
-		super().__init__(fem_handler, bc_handler, settings)
-		self.elastic_element = ElasticElement(self.fem_handler, self.settings, element_name="Spring")
+	def __init__(self, fem_handler, bc_handler, input_model):
+		super().__init__(fem_handler, bc_handler, input_model)
+		self.elastic_element = ElasticElement(self.fem_handler, self.input_model, element_name="Spring")
 
 	def initialize(self, time_handler):
 		pass
@@ -92,9 +92,9 @@ class ElasticModel(MechanicsModel):
 
 
 class ViscoelasticModel(MechanicsModel):
-	def __init__(self, fem_handler, bc_handler, settings):
-		super().__init__(fem_handler, bc_handler, settings)
-		self.elastic_element = ViscoelasticElement(self.fem_handler, self.settings)
+	def __init__(self, fem_handler, bc_handler, input_model):
+		super().__init__(fem_handler, bc_handler, input_model)
+		self.elastic_element = ViscoelasticElement(self.fem_handler, self.input_model)
 
 	def initialize(self, time_handler):
 		pass
@@ -152,9 +152,9 @@ class ViscoelasticModel(MechanicsModel):
 
 
 class MaxwellModel(MechanicsModel):
-	def __init__(self, fem_handler, bc_handler, settings):
-		super().__init__(fem_handler, bc_handler, settings)
-		self.elastic_element = ElasticElement(self.fem_handler, self.settings, element_name="Spring")
+	def __init__(self, fem_handler, bc_handler, input_model):
+		super().__init__(fem_handler, bc_handler, input_model)
+		self.elastic_element = ElasticElement(self.fem_handler, self.input_model, element_name="Spring")
 		self.inelastic_elements = []
 
 	def add_inelastic_element(self, inelastic_element):
@@ -240,9 +240,9 @@ class MaxwellModel(MechanicsModel):
 
 
 class BurgersModel(MechanicsModel):
-	def __init__(self, fem_handler, bc_handler, settings):
-		super().__init__(fem_handler, bc_handler, settings)
-		self.elastic_element = ViscoelasticElement(self.fem_handler, self.settings, element_name="Viscoelastic")
+	def __init__(self, fem_handler, bc_handler, input_model):
+		super().__init__(fem_handler, bc_handler, input_model)
+		self.elastic_element = ViscoelasticElement(self.fem_handler, self.input_model, element_name="Viscoelastic")
 		self.inelastic_elements = []
 
 	def add_inelastic_element(self, inelastic_element):
@@ -329,10 +329,10 @@ class BurgersModel(MechanicsModel):
 
 
 class ElastoViscoplasticModel(MechanicsModel):
-	def __init__(self, fem_handler, bc_handler, settings):
-		super().__init__(fem_handler, bc_handler, settings)
-		self.elastic_element = ElasticElement(self.fem_handler, self.settings, element_name="Elastic")
-		self.viscoplastic_element = ViscoplasticElement(self.fem_handler, self.settings, element_name="Viscoplastic")
+	def __init__(self, fem_handler, bc_handler, input_model):
+		super().__init__(fem_handler, bc_handler, input_model)
+		self.elastic_element = ElasticElement(self.fem_handler, self.input_model, element_name="Elastic")
+		self.viscoplastic_element = ViscoplasticElement(self.fem_handler, self.input_model, element_name="Viscoplastic")
 
 	def initialize(self, time_handler):
 		# Stiffness matrix
@@ -374,9 +374,9 @@ class ElastoViscoplasticModel(MechanicsModel):
 
 
 class GeneralModel(MechanicsModel):
-	def __init__(self, fem_handler, bc_handler, settings):
-		super().__init__(fem_handler, bc_handler, settings)
-		self.elastic_element = ElasticElement(self.fem_handler, self.settings, element_name="Elastic")
+	def __init__(self, fem_handler, bc_handler, input_model):
+		super().__init__(fem_handler, bc_handler, input_model)
+		self.elastic_element = ElasticElement(self.fem_handler, self.input_model, element_name="Elastic")
 		self.inelastic_elements = []
 
 	def add_inelastic_element(self, inelastic_element):

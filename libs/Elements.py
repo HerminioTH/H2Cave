@@ -36,14 +36,14 @@ class BaseElement(metaclass=abc.ABCMeta):
 
 
 class ElasticElement(BaseElement):
-	def __init__(self, fem_handler, settings, element_name="Spring"):
+	def __init__(self, fem_handler, input_model, element_name="Spring"):
 		super().__init__(fem_handler)
 		self.element_name = element_name
 		self.A = 0
 		self.b = 0
 
 		self.__initialize_tensors()
-		self.__load_props(settings)
+		self.__load_props(input_model)
 		self.__initialize_constitutive_matrices()
 
 	def build_A(self):
@@ -68,9 +68,9 @@ class ElasticElement(BaseElement):
 		self.eps_e = local_projection(zero_tensor, self.TS)
 		self.stress = local_projection(zero_tensor, self.TS)
 
-	def __load_props(self, settings):
-		self.E = Constant(settings["Elements"][self.element_name]["E"])
-		self.nu = Constant(settings["Elements"][self.element_name]["nu"])
+	def __load_props(self, input_model):
+		self.E = Constant(input_model["Elements"][self.element_name]["E"])
+		self.nu = Constant(input_model["Elements"][self.element_name]["nu"])
 
 	def __initialize_constitutive_matrices(self):
 		self.C0_sy = constitutive_matrix_sy(self.E, self.nu)
@@ -78,15 +78,15 @@ class ElasticElement(BaseElement):
 
 
 class ViscoelasticElement(BaseElement):
-	def __init__(self, fem_handler, settings, element_name="Viscoelastic"):
+	def __init__(self, fem_handler, input_model, element_name="Viscoelastic"):
 		super().__init__(fem_handler)
 		self.element_name = element_name
-		self.theta = settings["Time"]["theta"]
+		self.theta = input_model["Time"]["theta"]
 		self.A = 0
 		self.b = 0
 
 		self.__initialize_tensors()
-		self.__load_props(settings)
+		self.__load_props(input_model)
 		self.__initialize_constitutive_matrices()
 
 	def build_A_elastic(self):
@@ -154,12 +154,12 @@ class ViscoelasticElement(BaseElement):
 		self.eps_v_old = local_projection(zero_tensor, self.TS)
 		self.eps_tot_old = local_projection(zero_tensor, self.TS)
 
-	def __load_props(self, settings):
-		self.E0 = Constant(settings["Elements"]["Spring"]["E"])
-		self.nu0 = Constant(settings["Elements"]["Spring"]["nu"])
-		self.E1 = Constant(settings["Elements"]["KelvinVoigt"]["E"])
-		self.nu1 = Constant(settings["Elements"]["KelvinVoigt"]["nu"])
-		self.eta = Constant(settings["Elements"]["KelvinVoigt"]["eta"])
+	def __load_props(self, input_model):
+		self.E0 = Constant(input_model["Elements"]["Spring"]["E"])
+		self.nu0 = Constant(input_model["Elements"]["Spring"]["nu"])
+		self.E1 = Constant(input_model["Elements"]["KelvinVoigt"]["E"])
+		self.nu1 = Constant(input_model["Elements"]["KelvinVoigt"]["nu"])
+		self.eta = Constant(input_model["Elements"]["KelvinVoigt"]["eta"])
 
 
 	def __initialize_constitutive_matrices(self):
