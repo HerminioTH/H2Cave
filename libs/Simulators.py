@@ -96,7 +96,7 @@ class Simulator():
 
 
 
-def H2CaveSimulator(settings):
+def H2CaveSimulator(input_model, input_bc):
 	import os
 	import time
 	import shutil
@@ -112,37 +112,37 @@ def H2CaveSimulator(settings):
 	from Utils import sec, save_json
 
 	# Define folders
-	output_folder = os.path.join(*settings["Paths"]["Output"].split("/"))
-	grid_folder = os.path.join(*settings["Paths"]["Grid"].split("/"))
+	output_folder = os.path.join(*input_model["Paths"]["Output"].split("/"))
+	grid_folder = os.path.join(*input_model["Paths"]["Grid"].split("/"))
 
 	# Load grid
 	grid = GridHandler("geom", grid_folder)
 
 	# Define time handler
-	time_handler = TimeHandler(settings["Time"])
+	time_handler = TimeHandler(input_bc["Time"])
 
 	# Define finite element handler (function spaces, normal vectors, etc)
 	fem_handler = FemHandler(grid)
 
 	# Define boundary condition handler
-	bc_handler = MechanicsBoundaryConditions(fem_handler, settings)
+	bc_handler = MechanicsBoundaryConditions(fem_handler, input_bc)
 
 	# Build model
-	inelastic_elements = settings["Model"].copy()
-	if "Spring" not in settings["Model"]:
+	inelastic_elements = input_model["Model"].copy()
+	if "Spring" not in input_model["Model"]:
 		raise Exception("Model must have a Spring element.")
 
-	elif "KelvinVoigt" not in settings["Model"]:
-		if len(settings["Model"]) == 1:
-			model = ElasticModel(fem_handler, bc_handler, settings)
+	elif "KelvinVoigt" not in input_model["Model"]:
+		if len(input_model["Model"]) == 1:
+			model = ElasticModel(fem_handler, bc_handler, input_model)
 		else:
-			model = MaxwellModel(fem_handler, bc_handler, settings)
+			model = MaxwellModel(fem_handler, bc_handler, input_model)
 
-	elif "KelvinVoigt" in settings["Model"]:
-		if len(settings["Model"]) == 2:
-			model = ViscoelasticModel(fem_handler, bc_handler, settings)
+	elif "KelvinVoigt" in input_model["Model"]:
+		if len(input_model["Model"]) == 2:
+			model = ViscoelasticModel(fem_handler, bc_handler, input_model)
 		else:
-			model = BurgersModel(fem_handler, bc_handler, settings)
+			model = BurgersModel(fem_handler, bc_handler, input_model)
 		inelastic_elements.remove("KelvinVoigt")
 	inelastic_elements.remove("Spring")
 
@@ -152,11 +152,11 @@ def H2CaveSimulator(settings):
 					"PressureSolutionCreep": PressureSolutionCreep,
 					"Damage": Damage}
 	for element_name in inelastic_elements:
-		model.add_inelastic_element(ELEMENT_DICT[element_name](fem_handler, settings, element_name=element_name))
+		model.add_inelastic_element(ELEMENT_DICT[element_name](fem_handler, input_model, element_name=element_name))
 
 	# Build simulator
-	sim = Simulator(time_handler
-)
+	sim = Simulator(time_handler)
+
 	# Add models
 	sim.add_model(model)
 
@@ -164,52 +164,52 @@ def H2CaveSimulator(settings):
 	sim.add_event(VtkSaver("displacement", model.u, time_handler, output_folder))
 
 	# Save stress field
-	if settings["Elements"]["Spring"]["save_stress_vtk"] == True:
-		field_name = settings["Elements"]["Spring"]["stress_name"]
+	if input_model["Elements"]["Spring"]["save_stress_vtk"] == True:
+		field_name = input_model["Elements"]["Spring"]["stress_name"]
 		sim.add_event(VtkSaver(field_name, model.elastic_element.stress, time_handler, output_folder))
-	if settings["Elements"]["Spring"]["save_stress_avg"] == True:
-		field_name = settings["Elements"]["Spring"]["stress_name"]
+	if input_model["Elements"]["Spring"]["save_stress_avg"] == True:
+		field_name = input_model["Elements"]["Spring"]["stress_name"]
 		sim.add_event(AverageSaver(fem_handler.dx(), field_name, model.elastic_element.stress, time_handler, output_folder))
 
 	# Save total strain field
-	if settings["Elements"]["Spring"]["save_total_strain_vtk"] == True:
-		field_name = settings["Elements"]["Spring"]["total_strain_name"]
+	if input_model["Elements"]["Spring"]["save_total_strain_vtk"] == True:
+		field_name = input_model["Elements"]["Spring"]["total_strain_name"]
 		sim.add_event(VtkSaver(field_name, model.elastic_element.eps_tot, time_handler, output_folder))
-	if settings["Elements"]["Spring"]["save_total_strain_avg"] == True:
-		field_name = settings["Elements"]["Spring"]["total_strain_name"]
+	if input_model["Elements"]["Spring"]["save_total_strain_avg"] == True:
+		field_name = input_model["Elements"]["Spring"]["total_strain_name"]
 		sim.add_event(AverageSaver(fem_handler.dx(), field_name, model.elastic_element.eps_tot, time_handler, output_folder))
 	
 	# Save elastic strain field
-	if settings["Elements"]["Spring"]["save_strain_vtk"] == True:
-		field_name = settings["Elements"]["Spring"]["strain_name"]
+	if input_model["Elements"]["Spring"]["save_strain_vtk"] == True:
+		field_name = input_model["Elements"]["Spring"]["strain_name"]
 		sim.add_event(VtkSaver(field_name, model.elastic_element.eps_e, time_handler, output_folder))
-	if settings["Elements"]["Spring"]["save_strain_avg"] == True:
-		field_name = settings["Elements"]["Spring"]["strain_name"]
+	if input_model["Elements"]["Spring"]["save_strain_avg"] == True:
+		field_name = input_model["Elements"]["Spring"]["strain_name"]
 		sim.add_event(AverageSaver(fem_handler.dx(), field_name, model.elastic_element.eps_e, time_handler, output_folder))
 
 	# Save viscoelastic strain field
-	if "KelvinVoigt" in settings["Model"]:
-		if settings["Elements"]["KelvinVoigt"]["save_strain_vtk"] == True:
-			field_name = settings["Elements"]["KelvinVoigt"]["strain_name"]
+	if "KelvinVoigt" in input_model["Model"]:
+		if input_model["Elements"]["KelvinVoigt"]["save_strain_vtk"] == True:
+			field_name = input_model["Elements"]["KelvinVoigt"]["strain_name"]
 			sim.add_event(VtkSaver(field_name, model.elastic_element.eps_v, time_handler, output_folder))
-		if settings["Elements"]["KelvinVoigt"]["save_strain_avg"] == True:
-			field_name = settings["Elements"]["KelvinVoigt"]["strain_name"]
+		if input_model["Elements"]["KelvinVoigt"]["save_strain_avg"] == True:
+			field_name = input_model["Elements"]["KelvinVoigt"]["strain_name"]
 			sim.add_event(AverageSaver(fem_handler.dx(), field_name, model.elastic_element.eps_v, time_handler, output_folder))
 
 	# Save inelastic strain fields
 	for element_name in inelastic_elements:
 		index = inelastic_elements.index(element_name)
-		if settings["Elements"][element_name]["save_strain_vtk"] == True:
-			field_name = settings["Elements"][element_name]["strain_name"]
+		if input_model["Elements"][element_name]["save_strain_vtk"] == True:
+			field_name = input_model["Elements"][element_name]["strain_name"]
 			sim.add_event(VtkSaver(field_name, model.inelastic_elements[index].eps_ie, time_handler, output_folder))
-		if settings["Elements"][element_name]["save_strain_avg"] == True:
-			field_name = settings["Elements"][element_name]["strain_name"]
+		if input_model["Elements"][element_name]["save_strain_avg"] == True:
+			field_name = input_model["Elements"][element_name]["strain_name"]
 			sim.add_event(AverageSaver(fem_handler.dx(), field_name, model.inelastic_elements[index].eps_ie, time_handler, output_folder))
 
 	# If damage model is included, save damage field
 	if "Damage" in inelastic_elements:
 		i_damage = inelastic_elements.index("Damage")
-		name_damage = settings["Elements"]["Damage"]["damage_name"]
+		name_damage = input_model["Elements"]["Damage"]["damage_name"]
 		vtk_damage_saver = VtkSaver(name_damage, model.inelastic_elements[i_damage].D, time_handler, output_folder)
 		avg_damage_saver = AverageScalerSaver(fem_handler.dx(), name_damage, model.inelastic_elements[i_damage].D, time_handler, output_folder)
 		sim.add_event(vtk_damage_saver)
@@ -249,7 +249,8 @@ def H2CaveSimulator(settings):
 	# Copy .msh mesh to output_folder
 	shutil.copy(os.path.join(grid_folder, "geom.msh"), os.path.join(output_folder, "vtk"))
 	# shutil.copy(__file__, os.path.join(output_folder, "copy.py"))
-	save_json(settings, os.path.join(output_folder, "settings.json"))
+	save_json(input_model, os.path.join(output_folder, "input_model.json"))
+	save_json(input_bc, os.path.join(output_folder, "input_bc_fem.json"))
 
 
 
