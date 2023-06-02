@@ -333,10 +333,6 @@ class PressureSolutionCreep(BaseElement):
 		self.A = Constant(settings["Elements"][self.element_name]["A"])
 		self.n = Constant(settings["Elements"][self.element_name]["n"])
 		self.d = Constant(settings["Elements"][self.element_name]["d"])
-		# self.T = Constant(settings[self.element_name]["T"])
-		# self.R = 8.32		# Universal gas constant
-		# self.Q = 51600  	# Creep activation energy, [J/mol]
-		# self.B = float(self.A)*np.exp(-self.Q/(self.R*float(self.T)))
 		self.B = float(self.A)/(self.d**self.n)
 
 	def __initialize_tensors(self,):
