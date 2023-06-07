@@ -281,7 +281,19 @@ class Damage(BaseSolution):
 		sigma_star = von_Mises*np.sqrt((2/3)*(1 + self.nu + 3*(1 - 2*self.nu)*(sigma_m/von_Mises)**2))
 
 		# Compute damage
-		D = 1 - (1 - t*(1+self.r)*(sigma_star/self.B)**self.r)**(1/(1+self.r))
+		D_old = self.D_list[-1]
+		D_k = D_old
+		tol = 1e-7
+		error = 2*tol
+		ite = 0
+		while error > tol:
+			D_rate = (sigma_star/(self.B*(1 - D_k)))**self.r
+			D = D_old + dt*D_rate
+			error = abs(D_k - D)
+			D_k = D
+			ite += 1
+		# print(ite, D, error)
+		# D = 1 - (1 - t*(1+self.r)*(sigma_star/self.B)**self.r)**(1/(1+self.r))
 
 		# Save damage
 		self.D_list.append(D)
