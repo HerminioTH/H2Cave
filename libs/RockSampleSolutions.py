@@ -336,6 +336,7 @@ class ViscoplasticDesai(BaseSolution):
 			self.compute_yield_function(stress_MPa)
 			# print("Fvp:", self.Fvp)
 			
+			ite = 1
 			if self.Fvp <= 0:
 				self.eps.append(self.eps[-1])
 				self.alphas.append(self.alpha)
@@ -346,7 +347,6 @@ class ViscoplasticDesai(BaseSolution):
 				error = 2*tol
 				maxiter = 20
 				alpha_last = self.alpha
-				ite = 1
 				while error > tol and ite < maxiter:
 					strain_rate = self.__compute_strain_rate(stress_MPa)
 
@@ -382,6 +382,7 @@ class ViscoplasticDesai(BaseSolution):
 
 			# print(self.alpha, self.Fvp, ite, strain_rate.flatten()[[0,4,8]])
 			# print(self.alpha, self.Fvp, ite, stress_MPa)
+			print(self.alpha, self.Fvp, ite, strain_rate.flatten()[[0,4,8]])
 
 		self.eps = np.array(self.eps)
 		self.alphas = np.array(self.alphas)
@@ -402,6 +403,7 @@ class ViscoplasticDesai(BaseSolution):
 
 	def __update_alpha(self):
 		self.alpha = self.a_1 / (self.qsi**self.eta)
+		# self.alpha = self.a_1 / (self.a_1/self.alpha_0 + self.qsi**self.eta)
 
 	def __update_alpha_q(self):
 		self.alpha_q = self.alpha + self.k_v*(self.alpha_0 - self.alpha)*(1 - self.qsi_v/self.qsi)
@@ -435,6 +437,7 @@ class ViscoplasticDesai(BaseSolution):
 		self.alpha_qs = [self.alpha_q]
 		self.Fvp_list = [0]
 		self.qsi_old = (self.a_1/self.alpha)**(1/self.eta)
+		# self.qsi_old = 0.0
 		self.qsi_v_old = self.qsi_old
 
 	def __compute_stress_invariants(self, s_xx, s_yy, s_zz, s_xy, s_xz, s_yz):
@@ -451,7 +454,6 @@ class ViscoplasticDesai(BaseSolution):
 
 	def __compute_Sr(self, J2, J3):
 		return -(J3*np.sqrt(27))/(2*J2**1.5)
-		# return (J3**(1/3))/(J2**0.5)
 
 	def compute_yield_function(self, stress_MPa):
 		I1, I2, I3 = self.__compute_stress_invariants(*stress_MPa)
@@ -506,6 +508,239 @@ class ViscoplasticDesai(BaseSolution):
 		dQdS[0,1] = dQdS[1,0] = self.dQdSxy(*stress, alpha_q)
 		dQdS[0,2] = dQdS[2,0] = self.dQdSxz(*stress, alpha_q)
 		dQdS[1,2] = dQdS[2,1] = self.dQdSyz(*stress, alpha_q)
+		return dQdS
+
+
+
+
+class ViscoplasticDesai2(BaseSolution):
+	def __init__(self, input_model, input_bc):
+		super().__init__(input_bc)
+		self.__load_properties(input_model)
+		self.__initialize_variables()
+		self.qsi = 0.0
+
+	def compute_strains(self):
+		self.eps = [np.zeros((3,3))]
+		for i in range(1, len(self.time_list)):
+			dt = self.time_list[i] - self.time_list[i-1]
+			# print(dt)
+			# dt /= day
+			stress_MPa = self.sigmas[i,:].copy()/MPa
+			self.compute_yield_function(stress_MPa)
+			# print("Fvp:", self.Fvp)
+			
+			ite = 1
+			if self.Fvp <= 0:
+				self.eps.append(self.eps[-1])
+				self.alphas.append(self.alpha)
+				self.alpha_qs.append(self.alpha_q)
+				self.Fvp_list.append(self.Fvp)
+			else:
+				tol = 1e-6
+				error = 2*tol
+				maxiter = 20
+				alpha_last = self.alpha
+				while error > tol and ite < maxiter:
+					strain_rate = self.__compute_strain_rate(stress_MPa)
+
+					increment = double_dot(strain_rate, strain_rate)**0.5*dt
+					self.qsi = self.qsi_old + increment
+
+
+					increment_v = (strain_rate[0,0] + strain_rate[1,1] + strain_rate[2,2])*dt
+					self.qsi_v = self.qsi_v_old + increment_v
+
+					self.__update_kv(stress_MPa)
+					self.__update_alpha()
+					self.__update_alpha_q()
+
+					error = abs(self.alpha - alpha_last)
+					alpha_last = self.alpha
+					self.compute_yield_function(stress_MPa)
+
+					ite += 1
+					if ite >= maxiter:
+						print(f"Maximum number of iterations ({maxiter}) reached.")
+
+				# string = (i, self.Fvp, strain_rate[0,0], strain_rate[1,1], strain_rate[2,2], (strain_rate[0,1]+strain_rate[0,2]+strain_rate[1,2]))
+				# print("%i | %.4e | %.4e | %.4e | %.4e | %.4e"%string)
+				# print(i, strain_rate[0,0], strain_rate[1,1], strain_rate[2,2], (strain_rate[0,1]+strain_rate[0,2]+strain_rate[1,2]))
+
+				self.qsi_old = self.qsi
+				self.qsi_v_old = self.qsi_v
+				self.eps.append(self.eps[-1] + strain_rate*dt)
+				self.alphas.append(self.alpha)
+				self.alpha_qs.append(self.alpha_q)
+				self.Fvp_list.append(self.Fvp)
+
+			# print(self.alpha, self.Fvp, ite, strain_rate.flatten()[[0,4,8]])
+
+		self.eps = np.array(self.eps)
+		self.alphas = np.array(self.alphas)
+		self.alpha_qs = np.array(self.alpha_qs)
+
+	def __update_kv(self, stress_MPa):
+		# sigma = stress_MPa[2]
+		# self.k_v = -0.00085*sigma**2 + 0.015*sigma + 0.21
+		# self.k_v = 0.18
+		# coeffs = [2.39027657e-06, -4.54946293e-05, -6.57580943e-04,  4.99265504e-03,  1.81960713e-01, -6.45373053e-01]
+		# coeffs = [-2.25330759e-07,  7.08080098e-06,  4.63967164e-05, -2.08478762e-03, -2.79699173e-02,  8.07033586e-01, -3.33527302e+00]
+		# coeffs = [ 0.00859745, -0.34279313,  3.41342767]
+		# coeffs = [ 0.00878372, -0.33816767,  3.28399277]
+		# coeffs = [-7.66399407e-05,  3.77666296e-03, -6.25699148e-02,  4.23032481e-01, -8.83596888e-01]
+		# func = np.poly1d(coeffs)
+		# self.k_v = func(sigma)
+		pass
+
+	def __update_alpha(self):
+		self.alpha = self.a_1 / (self.qsi**self.eta)
+		# self.alpha = self.a_1 / (self.a_1/self.alpha_0 + self.qsi**self.eta)
+
+	def __update_alpha_q(self):
+		self.alpha_q = self.alpha + self.k_v*(self.alpha_0 - self.alpha)*(1 - self.qsi_v/self.qsi)
+
+	def __compute_strain_rate(self, stress_MPa):
+		n_flow = self.evaluate_flow_direction(stress_MPa, self.alpha_q)
+		# print(n_flow)
+		lmbda = self.mu_1*(self.Fvp/self.F0)**self.N_1
+		strain_rate = lmbda*n_flow
+		return strain_rate
+
+	def __load_properties(self, input_model):
+		self.mu_1 = input_model["Elements"]["ViscoplasticDesai"]["mu_1"]
+		self.N_1 = input_model["Elements"]["ViscoplasticDesai"]["N_1"]
+		self.n = input_model["Elements"]["ViscoplasticDesai"]["n"]
+		self.a_1 = input_model["Elements"]["ViscoplasticDesai"]["a_1"]
+		self.eta = input_model["Elements"]["ViscoplasticDesai"]["eta"]
+		self.beta_1 = input_model["Elements"]["ViscoplasticDesai"]["beta_1"]
+		self.beta = input_model["Elements"]["ViscoplasticDesai"]["beta"]
+		self.m = input_model["Elements"]["ViscoplasticDesai"]["m"]
+		self.gamma = input_model["Elements"]["ViscoplasticDesai"]["gamma"]
+		self.k_v = input_model["Elements"]["ViscoplasticDesai"]["k_v"]
+		self.sigma_t = input_model["Elements"]["ViscoplasticDesai"]["sigma_t"]
+		self.alpha_0 = input_model["Elements"]["ViscoplasticDesai"]["alpha_0"]
+		self.F0 = input_model["Elements"]["ViscoplasticDesai"]["F_0"]
+
+	def __initialize_variables(self):
+		self.alpha = self.alpha_0
+		self.alpha_q = self.alpha_0
+		self.alphas = [self.alpha]
+		self.alpha_qs = [self.alpha_q]
+		self.Fvp_list = [0]
+		self.qsi_old = (self.a_1/self.alpha)**(1/self.eta)
+		# self.qsi_old = 0.0
+		self.qsi_v_old = self.qsi_old
+
+	def __compute_stress_invariants(self, s_xx, s_yy, s_zz, s_xy, s_xz, s_yz):
+		I1 = s_xx + s_yy + s_zz# + self.sigma_t
+		I2 = s_xx*s_yy + s_yy*s_zz + s_xx*s_zz - s_xy**2 - s_yz**2 - s_xz**2
+		I3 = s_xx*s_yy*s_zz + 2*s_xy*s_yz*s_xz - s_zz*s_xy**2 - s_xx*s_yz**2 - s_yy*s_xz**2
+		return I1, I2, I3
+
+	def __compute_deviatoric_invariants(self, I1, I2, I3):
+		J1 = np.zeros(I1.size) if type(I1) == np.ndarray else 0
+		J2 = (1/3)*I1**2 - I2
+		J3 = (2/27)*I1**3 - (1/3)*I1*I2 + I3
+		return J1, J2, J3
+
+	def __compute_Sr(self, J2, J3):
+		return -(J3*np.sqrt(27))/(2*J2**1.5)
+
+	def compute_yield_function(self, stress_MPa):
+		I1, I2, I3 = self.__compute_stress_invariants(*stress_MPa)
+		J1, J2, J3 = self.__compute_deviatoric_invariants(I1, I2, I3)
+		if J2 == 0.0:
+			self.Fvp = -100
+		else:
+			Sr = self.__compute_Sr(J2, J3)
+			I1_star = I1 + self.sigma_t
+			F1 = (-self.alpha*I1_star**self.n + self.gamma*I1_star**2)
+			F2 = (np.exp(self.beta_1*I1_star) - self.beta*Sr)**self.m
+			self.Fvp = J2 - F1*F2
+			print(I1_star, I1, J2, F2, F1)
+
+	def evaluate_flow_direction(self, stress_MPa, alpha_q):
+		s_xx = stress_MPa[0]
+		s_yy = stress_MPa[1]
+		s_zz = stress_MPa[2]
+		s_xy = stress_MPa[3]
+		s_xz = stress_MPa[4]
+		s_yz = stress_MPa[5]
+
+		I1, I2, I3 = self.__compute_stress_invariants(*stress_MPa)
+		J1, J2, J3 = self.__compute_deviatoric_invariants(I1, I2, I3)
+
+		I1_star = I1 + self.sigma_t
+		Sr = self.__compute_Sr(J2, J3)
+
+		F1 = (-self.alpha_q*I1**self.n + self.gamma*I1**2)
+		F2 = (np.exp(self.beta_1*I1) - self.beta*Sr)
+		F1_star = (-self.alpha_q*I1_star**self.n + self.gamma*I1_star**2)
+		F2_star = (np.exp(self.beta_1*I1_star) - self.beta*Sr)
+		F = J2 - F1_star*F2_star**self.m
+
+		I1_aux = I1#_star
+
+		dF1_dI1 = 2*self.gamma*I1_aux - self.alpha_q*self.n*I1_aux**(self.n-1)
+		dF2m_dI1 = self.beta_1*self.m*np.exp(self.beta_1*I1_aux)*F2**(self.m-1)
+		dF_dI1 = -(dF1_dI1*F2**self.m + F1*dF2m_dI1)
+		dF_dJ2 = 1 - (3*np.sqrt(27)*self.beta*J3*self.m*F1*F2**(self.m-1))/(4*J2**(5/2))
+
+		dF2_dJ2 = -(3*self.beta*J3*27**0.5)/(4*J2**(5/2))
+		dF_dJ2 = 1 - F1*self.m*F2**(self.m-1)*dF2_dJ2
+		dF_dJ3 = -self.m*F1*self.beta*np.sqrt(27)*F2**(self.m-1)/(2*J2**1.5)
+
+		dI1_dSxx = 1.0
+		dI1_dSyy = 1.0
+		dI1_dSzz = 1.0
+		dI1_dSxy = 0.0
+		dI1_dSxz = 0.0
+		dI1_dSyz = 0.0
+
+		dI2_dSxx = s_yy + s_zz
+		dI2_dSyy = s_xx + s_zz
+		dI2_dSzz = s_xx + s_yy
+		dI2_dSxy = -2*s_xy
+		dI2_dSxz = -2*s_xz
+		dI2_dSyz = -2*s_yz
+
+		dI3_dSxx = s_yy*s_zz - s_yz**2
+		dI3_dSyy = s_xx*s_zz - s_xz**2
+		dI3_dSzz = s_xx*s_yy - s_xy**2
+		dI3_dSxy = 2*(s_xz*s_yz - s_zz*s_xy)
+		dI3_dSxz = 2*(s_xy*s_yz - s_yy*s_xz)
+		dI3_dSyz = 2*(s_xz*s_xy - s_xx*s_yz)
+
+		dJ2_dI1 = (2/3)*I1
+		dJ2_dI2 = -1.0
+
+		dJ2_dSxx = dJ2_dI1*dI1_dSxx + dJ2_dI2*dI2_dSxx
+		dJ2_dSyy = dJ2_dI1*dI1_dSyy + dJ2_dI2*dI2_dSyy
+		dJ2_dSzz = dJ2_dI1*dI1_dSzz + dJ2_dI2*dI2_dSzz
+		dJ2_dSxy = dJ2_dI1*dI1_dSxy + dJ2_dI2*dI2_dSxy
+		dJ2_dSxz = dJ2_dI1*dI1_dSxz + dJ2_dI2*dI2_dSxz
+		dJ2_dSyz = dJ2_dI1*dI1_dSyz + dJ2_dI2*dI2_dSyz
+
+		dJ3_dI1 = (2/9)*I1**2 - (1/3)*I2
+		dJ3_dI2 = -(1/3)*I1
+		dJ3_dI3 = 1.0
+
+		dJ3_dSxx = dJ3_dI1*dI1_dSxx + dJ3_dI2*dI2_dSxx + dJ3_dI3*dI3_dSxx
+		dJ3_dSyy = dJ3_dI1*dI1_dSyy + dJ3_dI2*dI2_dSyy + dJ3_dI3*dI3_dSyy
+		dJ3_dSzz = dJ3_dI1*dI1_dSzz + dJ3_dI2*dI2_dSzz + dJ3_dI3*dI3_dSzz
+		dJ3_dSxy = dJ3_dI1*dI1_dSxy + dJ3_dI2*dI2_dSxy + dJ3_dI3*dI3_dSxy
+		dJ3_dSxz = dJ3_dI1*dI1_dSxz + dJ3_dI2*dI2_dSxz + dJ3_dI3*dI3_dSxz
+		dJ3_dSyz = dJ3_dI1*dI1_dSyz + dJ3_dI2*dI2_dSyz + dJ3_dI3*dI3_dSyz
+
+		dQdS = np.zeros((3,3))
+		dQdS[0,0] = dF_dI1*dI1_dSxx + dF_dJ2*dJ2_dSxx + dF_dJ3*dJ3_dSxx
+		dQdS[1,1] = dF_dI1*dI1_dSyy + dF_dJ2*dJ2_dSyy + dF_dJ3*dJ3_dSyy
+		dQdS[2,2] = dF_dI1*dI1_dSzz + dF_dJ2*dJ2_dSzz + dF_dJ3*dJ3_dSzz
+		dQdS[0,1] = dQdS[1,0] = dF_dI1*dI1_dSxy + dF_dJ2*dJ2_dSxy + dF_dJ3*dJ3_dSxy
+		dQdS[0,2] = dQdS[2,0] = dF_dI1*dI1_dSxz + dF_dJ2*dJ2_dSxz + dF_dJ3*dJ3_dSxz
+		dQdS[1,2] = dQdS[2,1] = dF_dI1*dI1_dSyz + dF_dJ2*dJ2_dSyz + dF_dJ3*dJ3_dSyz
+
 		return dQdS
 
 
@@ -576,26 +811,26 @@ class ViscoPlasticVonMises(BaseSolution):
 		self.a = input_model["Elements"]["ViscoplasticVonMises"]["a"]
 		self.alpha_0 = input_model["Elements"]["ViscoplasticVonMises"]["alpha_0"]
 
-	def compute_yield_function(self, sigma):
+	def __compute_yield_function(self, sigma):
 		stress = voigt2tensor(sigma)
 		s = stress - (1./3)*trace(stress)*np.eye(3)
 		q = np.sqrt((3/2.)*double_dot(s, s))
 		self.Fvp = q - self.yield_stress*self.alpha_0/self.alpha
 
-	def evaluate_flow_direction_FD(self, sigma):
+	def __evaluate_flow_direction_FD(self, sigma):
 		dSigma = 0.00001
 		dFdS = np.zeros(6)
 		for i in range(6):
 			s = sigma.copy()
 			s[i] += dSigma
-			self.compute_yield_function(sigma)
+			self.__compute_yield_function(sigma)
 			F_1 = self.Fvp
-			self.compute_yield_function(s)
+			self.__compute_yield_function(s)
 			F_2 = self.Fvp
 			dFdS[i] = -(F_1 - F_2)/dSigma
 		return voigt2tensor(dFdS)
 
-	def evaluate_flow_direction_AN(self, sigma):
+	def __evaluate_flow_direction_AN(self, sigma):
 		stress = voigt2tensor(sigma)
 		s = stress - (1./3)*trace(stress)*np.eye(3)
 		q = np.sqrt((3/2.)*double_dot(s, s))
@@ -609,8 +844,8 @@ class ViscoPlasticVonMises(BaseSolution):
 		return voigt2tensor(dFdS)
 
 	def __compute_strain_rate(self, sigma):
-		n_flow = self.evaluate_flow_direction_AN(sigma)
-		# n_flow = self.evaluate_flow_direction_FD(sigma)
+		n_flow = self.__evaluate_flow_direction_AN(sigma)
+		# n_flow = self.__evaluate_flow_direction_FD(sigma)
 		strain_rate = (self.Fvp/self.tau)*n_flow
 		return strain_rate
 
@@ -621,7 +856,7 @@ class ViscoPlasticVonMises(BaseSolution):
 		self.eps = [np.zeros((3,3))]
 		for i in range(1, len(self.time_list)):
 			dt = self.time_list[i] - self.time_list[i-1]
-			self.compute_yield_function(self.sigmas[i,:])
+			self.__compute_yield_function(self.sigmas[i,:])
 			
 			if self.Fvp <= 0:
 				self.eps.append(self.eps[-1])
@@ -643,7 +878,7 @@ class ViscoPlasticVonMises(BaseSolution):
 
 					error = abs(self.alpha - alpha_last)
 					alpha_last = self.alpha
-					self.compute_yield_function(self.sigmas[i,:])
+					self.__compute_yield_function(self.sigmas[i,:])
 
 					ite += 1
 					if ite >= maxiter:
