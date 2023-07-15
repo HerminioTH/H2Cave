@@ -990,7 +990,8 @@ class ViscoplasticDesaiElement(BaseElement):
 			# Get element values
 			qsi_elem = self.__get_scalar_at_element(qsi_vec, e)
 			qsi_v_elem = self.__get_scalar_at_element(qsi_v_vec, e)
-			stress_elem = self.__get_tensor_at_element(stress_vec, e)
+			# stress_elem = self.__get_tensor_at_element(stress_vec, e)
+			stress_elem = self.__get_stress_at_element(stress_vec, e)
 			alpha_elem = self.__get_scalar_at_element(alpha_vec, e)
 			alpha_q_elem = self.__get_scalar_at_element(alpha_q_vec, e)
 			Fvp_elem = self.compute_Fvp_at_element(stress_elem, alpha_elem)
@@ -1083,7 +1084,9 @@ class ViscoplasticDesaiElement(BaseElement):
 
 	def __get_stress_at_element(self, stress_field, elem):
 		ids = [9*elem+0, 9*elem+4, 9*elem+8, 9*elem+1, 9*elem+2, 9*elem+5]
-		tensor_elem_filtered = np.where(np.abs(stress_field) < 1e-1, 0, stress_field)
+		# tensor_elem_filtered = np.where(np.abs(stress_field) < 1e-1, 0, stress_field)[ids]
+		tensor_elem_filtered = np.where(np.abs(stress_field[ids]) < 1e-1, 0, stress_field[ids])
+		# tensor_elem_filtered = stress_field[ids]
 		return tensor_elem_filtered
 
 	def __get_tensor_at_element(self, tensor_field, elem):
