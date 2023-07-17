@@ -976,6 +976,8 @@ class ViscoplasticDesaiElement(BaseElement):
 		n_elems = self.alpha.vector()[:].size
 
 		stress_vec = -stress.vector()[:]/MPa
+		# stress_vec = np.where(np.abs(stress_vec) < 1e-3, 0, stress_vec)
+
 		alpha_vec = self.alpha.vector()[:]
 		alpha_q_vec = self.alpha_q.vector()[:]
 		qsi_vec = self.qsi.vector()[:]
@@ -1003,9 +1005,9 @@ class ViscoplasticDesaiElement(BaseElement):
 			strain_rate = np.zeros((3,3))
 
 			if Fvp_elem > 0.0:
-				tol = 1e-16
+				tol = 1e-12
 				error = 2*tol
-				maxiter = 2
+				maxiter = 10
 				ite = 1
 
 				Fvp_elem_last = Fvp_elem
@@ -1018,6 +1020,7 @@ class ViscoplasticDesaiElement(BaseElement):
 					# Compute flow direction
 					# flow_direction = self.compute_dQdS_at_element_0(stress_elem, alpha_elem)
 					flow_direction = self.compute_dQdS_at_element_1(stress_elem, alpha_elem)
+					# flow_direction = self.compute_dQdS_at_element_2(stress_elem, alpha_elem)
 					# flow_direction = self.compute_dQdS_at_element(stress_elem, alpha_elem)
 
 					# Compute viscoplastic strain rate
@@ -1068,7 +1071,9 @@ class ViscoplasticDesaiElement(BaseElement):
 		alpha_ind_min, alpha_min, alpha_ind_max, alpha_max, n_elems, alpha_avg = self.__compute_min_max_avg(self.alpha_array)
 		stress_min = self.__get_tensor_at_element(stress_vec, Fvp_ind_min)
 		stress_max = self.__get_tensor_at_element(stress_vec, Fvp_ind_max)
-		print("| " + "(%.4e, %.4e) | (%.4e, %.4e) | (%.4e, %.4e) |"%(self.alpha_array[Fvp_ind_min], self.alpha_array[Fvp_ind_max], Fvp_min, Fvp_max, stress_min[2], stress_max[2]))
+
+		msg = (self.alpha_array[Fvp_ind_min], self.alpha_array[Fvp_ind_max], Fvp_min, Fvp_max, stress_max[0], stress_max[1], stress_max[2], stress_max[3], stress_max[4], stress_max[5])
+		print("| " + "(%.4e, %.4e) | (%.4e, %.4e) | (%.4e, %.4e, %.4e, %.4e, %.4e, %.4e) |"%msg)
 
 		# print()
 		# stress_e = self.__get_tensor_at_element(stress_vec, Fvp_ind_min)
@@ -1085,8 +1090,8 @@ class ViscoplasticDesaiElement(BaseElement):
 	def __get_stress_at_element(self, stress_field, elem):
 		ids = [9*elem+0, 9*elem+4, 9*elem+8, 9*elem+1, 9*elem+2, 9*elem+5]
 		# tensor_elem_filtered = np.where(np.abs(stress_field) < 1e-1, 0, stress_field)[ids]
-		tensor_elem_filtered = np.where(np.abs(stress_field[ids]) < 1e-1, 0, stress_field[ids])
-		# tensor_elem_filtered = stress_field[ids]
+		# tensor_elem_filtered = np.where(np.abs(stress_field[ids]) < 1e-1, 0, stress_field[ids])
+		tensor_elem_filtered = stress_field[ids]
 		return tensor_elem_filtered
 
 	def __get_tensor_at_element(self, tensor_field, elem):
@@ -1339,9 +1344,31 @@ class ViscoplasticDesaiElement(BaseElement):
 		von_Mises = sqrt((3/2.)*double_dot(s, s))
 		# dQdS = s/von_Mises
 
-		# norm = np.linalg.norm(dQdS)
+		norm = np.linalg.norm(dQdS)
 		# norm = von_Mises
-		# dQdS = dQdS/norm
+		dQdS = dQdS/norm
+		return dQdS
+
+
+	def compute_dQdS_at_element_2(self, stress_MPa, alpha):
+		s_xx = stress_MPa[0]
+		s_yy = stress_MPa[1]
+		s_zz = stress_MPa[2]
+		s_xy = stress_MPa[3]
+		s_xz = stress_MPa[4]
+		s_yz = stress_MPa[5]
+
+		q = ( 0.5*( (s_xx - s_yy)**2 + (s_yy - s_zz)**2 + (s_zz - s_xx)**2 + 6*(s_xy**2 + s_xz**2 + s_yz**2) ) )**0.5
+
+		dQdS = np.zeros((3,3))
+		dQdS[0,0] = 2*s_xx - s_yy - s_zz
+		dQdS[1,1] = 2*s_yy - s_xx - s_zz
+		dQdS[2,2] = 2*s_zz - s_xx - s_yy
+		dQdS[0,1] = dQdS[1,0] = 3*s_xy/2
+		dQdS[0,2] = dQdS[2,0] = 3*s_xz/2
+		dQdS[1,2] = dQdS[2,1] = 3*s_yz/2
+		dQdS /= 1
+		# dQdS /= q
 		return dQdS
 
 

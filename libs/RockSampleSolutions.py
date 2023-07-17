@@ -381,8 +381,6 @@ class ViscoplasticDesai(BaseSolution):
 				self.Fvp_list.append(self.Fvp)
 
 			# print(self.alpha, self.Fvp, ite, strain_rate.flatten()[[0,4,8]])
-			# print(self.alpha, self.Fvp, ite, stress_MPa)
-			print(self.alpha, self.Fvp, ite, strain_rate.flatten()[[0,4,8]])
 
 		self.eps = np.array(self.eps)
 		self.alphas = np.array(self.alphas)
@@ -508,6 +506,9 @@ class ViscoplasticDesai(BaseSolution):
 		dQdS[0,1] = dQdS[1,0] = self.dQdSxy(*stress, alpha_q)
 		dQdS[0,2] = dQdS[2,0] = self.dQdSxz(*stress, alpha_q)
 		dQdS[1,2] = dQdS[2,1] = self.dQdSyz(*stress, alpha_q)
+
+		norm = np.linalg.norm(dQdS)
+		dQdS = dQdS/norm
 		return dQdS
 
 
