@@ -261,6 +261,7 @@ def SmpSimulator(input_model, input_bc):
 	'''
 	from RockSampleSolutions import Elastic, Viscoelastic, DislocationCreep, PressureSolutionCreep, Damage, ViscoplasticDesai, TensorSaver
 	from Utils import save_json
+	import numpy as np
 	import os
 
 	# Output folder
@@ -309,6 +310,24 @@ def SmpSimulator(input_model, input_bc):
 		strain_name = input_model["Elements"]["Spring"]["total_strain_name"]
 		saver_eps = TensorSaver(output_folder, strain_name)
 		saver_eps.save_results(model_elements[0].time_list, eps_tot)
+
+	# Safe internal parameters of Desai viscoplastic model
+	if "ViscoplasticDesai" in input_model["Model"]:
+		print(input_model["Model"])
+		index = input_model["Model"].index("ViscoplasticDesai")
+		element = model_elements[index]
+		if input_model["Elements"]["ViscoplasticDesai"]["save_Fvp_smp"] == True:
+			saver_Fvp = TensorSaver(output_folder, "Fvp")
+			Fvps = np.zeros(element.eps.shape)
+			Fvps[:,0,0] = element.Fvp_list
+			saver_Fvp.save_results(element.time_list, Fvps)
+		if input_model["Elements"]["ViscoplasticDesai"]["save_alpha_smp"] == True:
+			saver_alpha = TensorSaver(output_folder, "alpha")
+			alphas = np.zeros(element.eps.shape)
+			alphas[:,0,0] = element.alphas
+			saver_alpha.save_results(element.time_list, alphas)
+
+
 
 	# Save settings
 	save_json(input_bc, os.path.join(output_folder, "input_bc_smp.json"))

@@ -632,10 +632,10 @@ class ViscoplasticElement(BaseElement):
 		self.N_1 = settings["Elements"][self.element_name]["N_1"]
 		self.n = settings["Elements"][self.element_name]["n"]
 		self.a_1 = settings["Elements"][self.element_name]["a_1"]
-		self.eta_1 = settings["Elements"][self.element_name]["eta_1"]
+		self.eta_1 = settings["Elements"][self.element_name]["eta"]
 		self.beta_1 = settings["Elements"][self.element_name]["beta_1"]
 		self.beta = settings["Elements"][self.element_name]["beta"]
-		self.m_v = settings["Elements"][self.element_name]["m_v"]
+		self.m_v = settings["Elements"][self.element_name]["m"]
 		self.gamma = settings["Elements"][self.element_name]["gamma"]
 		self.alpha_0 = settings["Elements"][self.element_name]["alpha_0"]
 		self.k_v = settings["Elements"][self.element_name]["k_v"]
@@ -976,7 +976,7 @@ class ViscoplasticDesaiElement(BaseElement):
 		n_elems = self.alpha.vector()[:].size
 
 		stress_vec = -stress.vector()[:]/MPa
-		# stress_vec = np.where(np.abs(stress_vec) < 1e-3, 0, stress_vec)
+		stress_vec = np.where(np.abs(stress_vec) < 1e-2, 0, stress_vec)
 
 		alpha_vec = self.alpha.vector()[:]
 		alpha_q_vec = self.alpha_q.vector()[:]
@@ -1007,7 +1007,7 @@ class ViscoplasticDesaiElement(BaseElement):
 			if Fvp_elem > 0.0:
 				tol = 1e-12
 				error = 2*tol
-				maxiter = 10
+				maxiter = 1000
 				ite = 1
 
 				Fvp_elem_last = Fvp_elem
@@ -1388,6 +1388,10 @@ class ViscoplasticDesaiElement(BaseElement):
 		# s = sigma - (1./3)*(sigma[0,0] + sigma[1,1] + sigma[2,2])*np.eye(3)
 		# von_Mises = sqrt((3/2.)*double_dot(s, s))
 		# dQdS = s/von_Mises
+
+		norm = np.linalg.norm(dQdS)
+		# norm = von_Mises
+		dQdS = dQdS/norm
 		return dQdS
 
 	def __initialize_yield_and_potential_functions(self):
