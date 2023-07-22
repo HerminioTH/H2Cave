@@ -96,7 +96,7 @@ class Simulator():
 
 
 
-def H2CaveSimulator(input_model, input_bc):
+def H2CaveSimulator(input_model, input_bc, grid=None):
 	import os
 	import time
 	import shutil
@@ -108,7 +108,7 @@ def H2CaveSimulator(input_model, input_bc):
 	from BoundaryConditions import MechanicsBoundaryConditions
 	from Simulators import Simulator
 	from Models import MaxwellModel, BurgersModel, ElasticModel, ViscoelasticModel
-	from Elements import DashpotElement, DislocationCreep, PressureSolutionCreep, Damage
+	from Elements import DashpotElement, DislocationCreep, PressureSolutionCreep, Damage, ViscoplasticDesaiElement
 	from Utils import sec, save_json
 
 	# Define folders
@@ -116,7 +116,8 @@ def H2CaveSimulator(input_model, input_bc):
 	grid_folder = os.path.join(*input_model["Paths"]["Grid"].split("/"))
 
 	# Load grid
-	grid = GridHandler("geom", grid_folder)
+	if grid == None:
+		grid = GridHandler("geom", grid_folder)
 
 	# Define time handler
 	time_handler = TimeHandler(input_bc["Time"])
@@ -150,6 +151,7 @@ def H2CaveSimulator(input_model, input_bc):
 	ELEMENT_DICT = {"Dashpot": DashpotElement,
 					"DislocationCreep": DislocationCreep,
 					"PressureSolutionCreep": PressureSolutionCreep,
+					"ViscoplasticDesai": ViscoplasticDesaiElement,
 					"Damage": Damage}
 	for element_name in inelastic_elements:
 		model.add_inelastic_element(ELEMENT_DICT[element_name](fem_handler, input_model, element_name=element_name))
@@ -159,6 +161,8 @@ def H2CaveSimulator(input_model, input_bc):
 
 	# Add models
 	sim.add_model(model)
+
+	print(model.inelastic_elements)
 
 	# Save displacement field
 	sim.add_event(VtkSaver("displacement", model.u, time_handler, output_folder))
@@ -206,6 +210,22 @@ def H2CaveSimulator(input_model, input_bc):
 			field_name = input_model["Elements"][element_name]["strain_name"]
 			sim.add_event(AverageSaver(fem_handler.dx(), field_name, model.inelastic_elements[index].eps_ie, time_handler, output_folder))
 
+	# If Desai viscoplastic model is included, save Fvp and alpha fields
+	if "ViscoplasticDesai" in inelastic_elements:
+		i_desai = inelastic_elements.index("ViscoplasticDesai")
+		if input_model["Elements"]["ViscoplasticDesai"]["save_Fvp_vtk"] == True:
+			vtk_Fvp_saver = VtkSaver("Fvp", model.inelastic_elements[i_desai].F_vp, time_handler, output_folder)
+			sim.add_event(vtk_Fvp_saver)
+		if input_model["Elements"]["ViscoplasticDesai"]["save_Fvp_avg"] == True:
+			avg_Fvp_saver = AverageScalerSaver(fem_handler.dx(), "Fvp", model.inelastic_elements[i_desai].F_vp, time_handler, output_folder)
+			sim.add_event(avg_Fvp_saver)
+		if input_model["Elements"]["ViscoplasticDesai"]["save_alpha_vtk"] == True:
+			vtk_alpha_saver = VtkSaver("alpha", model.inelastic_elements[i_desai].alpha, time_handler, output_folder)
+			sim.add_event(vtk_alpha_saver)
+		if input_model["Elements"]["ViscoplasticDesai"]["save_alpha_avg"] == True:
+			avg_alpha_saver = AverageScalerSaver(fem_handler.dx(), "alpha", model.inelastic_elements[i_desai].alpha, time_handler, output_folder)
+			sim.add_event(avg_alpha_saver)
+
 	# If damage model is included, save damage field
 	if "Damage" in inelastic_elements:
 		i_damage = inelastic_elements.index("Damage")
@@ -223,8 +243,8 @@ def H2CaveSimulator(input_model, input_bc):
 
 	# Build controllers
 	if type(model) == MaxwellModel or type(model) == BurgersModel:
-		iteration_controller = IterationController("Iterations", max_ite=20)
-		error_controller = ErrorController("Error", model, tol=1e-8)
+		iteration_controller = IterationController("Iterations", max_ite=50)
+		error_controller = ErrorController("Error", model, tol=1e-6)
 		sim.add_controller(iteration_controller)
 		sim.add_controller(error_controller)
 
@@ -247,7 +267,10 @@ def H2CaveSimulator(input_model, input_bc):
 	print("Elapsed time: %.3f"%((end-start)/sec))
 
 	# Copy .msh mesh to output_folder
-	shutil.copy(os.path.join(grid_folder, "geom.msh"), os.path.join(output_folder, "vtk"))
+	try:
+		shutil.copy(os.path.join(grid_folder, "geom.msh"), os.path.join(output_folder, "vtk"))
+	except:
+		print("File geom.msh could not be saved.")
 	# shutil.copy(__file__, os.path.join(output_folder, "copy.py"))
 	save_json(input_model, os.path.join(output_folder, "input_model.json"))
 	save_json(input_bc, os.path.join(output_folder, "input_bc_fem.json"))
