@@ -1016,10 +1016,10 @@ class ViscoplasticDesaiElement(BaseElement):
 				qsi_v_old = qsi_v_elem
 
 				while error > tol and ite < maxiter:
-					
 					# Compute flow direction
 					# flow_direction = self.compute_dQdS_at_element_0(stress_elem, alpha_elem)
 					flow_direction = self.compute_dQdS_at_element_1(stress_elem, alpha_elem)
+					# flow_direction = self.compute_dQdS_at_element_vonMises(stress_elem, alpha_elem)
 					# flow_direction = self.compute_dQdS_at_element_2(stress_elem, alpha_elem)
 					# flow_direction = self.compute_dQdS_at_element(stress_elem, alpha_elem)
 
@@ -1251,6 +1251,16 @@ class ViscoplasticDesaiElement(BaseElement):
 
 		return dQdS
 
+	def compute_dQdS_at_element_vonMises(self, stress_MPa, alpha):
+		sigma = np.array([[stress_MPa[0], stress_MPa[3], stress_MPa[4]],
+					      [stress_MPa[3], stress_MPa[1], stress_MPa[5]],
+					      [stress_MPa[4], stress_MPa[5], stress_MPa[2]]
+		])
+		s = sigma - (1./3)*(sigma[0,0] + sigma[1,1] + sigma[2,2])*np.eye(3)
+		von_Mises = sqrt((3/2.)*double_dot(s, s))
+		dQdS = s/np.linalg.norm(s)
+		return dQdS
+
 	def compute_dQdS_at_element_1(self, stress_MPa, alpha):
 		s_xx = stress_MPa[0]
 		s_yy = stress_MPa[1]
@@ -1344,9 +1354,11 @@ class ViscoplasticDesaiElement(BaseElement):
 		von_Mises = sqrt((3/2.)*double_dot(s, s))
 		# dQdS = s/von_Mises
 
-		norm = np.linalg.norm(dQdS)
+		# norm = np.linalg.norm(dQdS)
 		# norm = von_Mises
-		dQdS = dQdS/norm
+		# dQdS = dQdS/von_Mises
+		dQdS = dQdS/np.linalg.norm(dQdS)
+		# dQdS = s/np.linalg.norm(s)
 		return dQdS
 
 
