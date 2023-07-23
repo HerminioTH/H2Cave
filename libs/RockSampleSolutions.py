@@ -897,3 +897,97 @@ class ViscoPlasticVonMises(BaseSolution):
 		self.alphas = np.array(self.alphas)
 
 
+
+class ViscoPlasticDruckerPrager(BaseSolution):
+	def __init__(self, input_model, input_bc):
+		super().__init__(input_bc)
+		self.__load_properties(input_model)
+		self.__initialize_variables()
+
+	def __initialize_variables(self):
+		self.alpha = np.sin(self.theta_rad)*( 1/(3**0.5*(3 + np.sin(self.theta_rad))) + 1/(3**0.5*(3 - np.sin(self.theta_rad))) )
+		self.k0 = 3*self.c*np.cos(self.theta_rad)*( 1/(3**0.5*(3 + np.sin(self.theta_rad))) + 1/(3**0.5*(3 - np.sin(self.theta_rad))) )
+		self.k = self.k0
+		self.ks = [self.k]
+		self.qsi = 0
+		self.qsi_old = 0
+		self.Fvp = 0
+		self.Fvp_list = [0]
+
+	def __load_properties(self, input_model):
+		self.c = input_model["Elements"]["ViscoPlasticDruckerPrager"]["c"]
+		self.theta_rad = np.radians(input_model["Elements"]["ViscoPlasticDruckerPrager"]["theta_deg"])
+		self.k1 = input_model["Elements"]["ViscoPlasticDruckerPrager"]["k1"]
+		self.k2 = input_model["Elements"]["ViscoPlasticDruckerPrager"]["k2"]
+		self.beta = input_model["Elements"]["ViscoPlasticDruckerPrager"]["beta"]
+		self.tau = input_model["Elements"]["ViscoPlasticDruckerPrager"]["tau"]
+
+	def __compute_yield_function(self, sigma):
+		stress = voigt2tensor(sigma)
+		s = stress - (1./3)*trace(stress)*np.eye(3)
+		I1 = trace(stress)
+		J2 = (1/2)*double_dot(s, s)
+		# print(-self.alpha*I1, np.sqrt(J2), self.k)
+		self.Fvp = -self.alpha*I1 + np.sqrt(J2) - self.k
+
+	def __evaluate_flow_direction(self, sigma):
+		stress = voigt2tensor(sigma)
+		s = stress - (1./3)*trace(stress)*np.eye(3)
+		J2 = (1/2)*double_dot(s, s)
+		I = np.eye(3)
+		# dQdS = -self.alpha*I + (0.5/np.sqrt(J2))*s
+		dQdS = -self.beta*I + (0.5/np.sqrt(J2))*s
+		return dQdS
+
+	def __compute_strain_rate(self, sigma):
+		n_flow = self.__evaluate_flow_direction(sigma)
+		strain_rate = (self.Fvp/self.tau)*n_flow
+		return strain_rate
+
+	def __update_hardening(self):
+		self.k = self.k0 + self.k1*(1 - np.exp(-self.k2*self.qsi))
+
+	def compute_strains(self):
+		self.eps = [np.zeros((3,3))]
+		for i in range(1, len(self.time_list)):
+			dt = self.time_list[i] - self.time_list[i-1]
+			stress_MPa = self.sigmas[i,:].copy()/MPa
+
+			self.__compute_yield_function(stress_MPa)
+			
+			if self.Fvp <= 0:
+				self.eps.append(self.eps[-1])
+				self.ks.append(self.k)
+				self.Fvp_list.append(self.Fvp)
+			else:
+				tol = 1e-6
+				error = 2*tol
+				maxiter = 20
+				k_last = self.k
+				ite = 1
+				while error > tol and ite < maxiter:
+					strain_rate = self.__compute_strain_rate(stress_MPa)
+
+					increment = double_dot(strain_rate, strain_rate)**0.5*dt
+					self.qsi = self.qsi_old + increment
+
+					self.__update_hardening()
+
+					error = abs(self.k - k_last)
+					k_last = self.k
+					self.__compute_yield_function(stress_MPa)
+
+					ite += 1
+					if ite >= maxiter:
+						print(f"Maximum number of iterations ({maxiter}) reached.")
+
+				self.qsi_old = self.qsi
+				self.eps.append(self.eps[-1] + strain_rate*dt)
+				self.ks.append(self.k)
+				self.Fvp_list.append(self.Fvp)
+
+			print(self.Fvp, self.k, self.k0, self.k1, self.qsi)
+		self.eps = np.array(self.eps)
+		self.ks = np.array(self.ks)
+
+
