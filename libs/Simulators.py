@@ -282,7 +282,7 @@ def SmpSimulator(input_model, input_bc):
 	'''
 		This is a simulator for the Simplified Model, which has nothing to do with the Finite Elements.
 	'''
-	from RockSampleSolutions import Elastic, Viscoelastic, DislocationCreep, PressureSolutionCreep, Damage, ViscoplasticDesai, TensorSaver
+	from RockSampleSolutions import Elastic, Viscoelastic, DislocationCreep, PressureSolutionCreep, Damage, ViscoplasticDesai, ViscoPlasticDruckerPrager, TensorSaver
 	from Utils import save_json
 	import numpy as np
 	import os
@@ -305,6 +305,8 @@ def SmpSimulator(input_model, input_bc):
 		model_elements.append(Damage(input_model, input_bc))
 	if "ViscoplasticDesai" in input_model["Model"]:
 		model_elements.append(ViscoplasticDesai(input_model, input_bc))
+	if "ViscoPlasticDruckerPrager" in input_model["Model"]:
+		model_elements.append(ViscoPlasticDruckerPrager(input_model, input_bc))
 
 	# Compute total strain
 	eps_tot = 0
@@ -319,7 +321,8 @@ def SmpSimulator(input_model, input_bc):
 						DislocationCreep : "DislocationCreep",
 						PressureSolutionCreep : "PressureSolutionCreep",
 						Damage : "Damage",
-						ViscoplasticDesai : "ViscoplasticDesai"
+						ViscoplasticDesai : "ViscoplasticDesai",
+						ViscoPlasticDruckerPrager : "ViscoPlasticDruckerPrager"
 	}
 	for element in model_elements:
 		element_name = ELEMENT_DICT[type(element)]
@@ -334,7 +337,7 @@ def SmpSimulator(input_model, input_bc):
 		saver_eps = TensorSaver(output_folder, strain_name)
 		saver_eps.save_results(model_elements[0].time_list, eps_tot)
 
-	# Safe internal parameters of Desai viscoplastic model
+	# Save internal parameters of Desai viscoplastic model
 	if "ViscoplasticDesai" in input_model["Model"]:
 		print(input_model["Model"])
 		index = input_model["Model"].index("ViscoplasticDesai")
@@ -345,6 +348,22 @@ def SmpSimulator(input_model, input_bc):
 			Fvps[:,0,0] = element.Fvp_list
 			saver_Fvp.save_results(element.time_list, Fvps)
 		if input_model["Elements"]["ViscoplasticDesai"]["save_alpha_smp"] == True:
+			saver_alpha = TensorSaver(output_folder, "alpha")
+			alphas = np.zeros(element.eps.shape)
+			alphas[:,0,0] = element.alphas
+			saver_alpha.save_results(element.time_list, alphas)
+
+	# Save internal parameters of Durcker-Prager viscoplastic model
+	if "ViscoPlasticDruckerPrager" in input_model["Model"]:
+		print(input_model["Model"])
+		index = input_model["Model"].index("ViscoPlasticDruckerPrager")
+		element = model_elements[index]
+		if input_model["Elements"]["ViscoPlasticDruckerPrager"]["save_Fvp_smp"] == True:
+			saver_Fvp = TensorSaver(output_folder, "Fvp")
+			Fvps = np.zeros(element.eps.shape)
+			Fvps[:,0,0] = element.Fvp_list
+			saver_Fvp.save_results(element.time_list, Fvps)
+		if input_model["Elements"]["ViscoPlasticDruckerPrager"]["save_alpha_smp"] == True:
 			saver_alpha = TensorSaver(output_folder, "alpha")
 			alphas = np.zeros(element.eps.shape)
 			alphas[:,0,0] = element.alphas
