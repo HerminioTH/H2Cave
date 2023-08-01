@@ -934,9 +934,9 @@ class ViscoPlasticDruckerPrager(BaseSolution):
 
 	def __evaluate_flow_direction(self, sigma):
 		stress = voigt2tensor(sigma)
-		s = stress - (1./3)*trace(stress)*np.eye(3)
-		J2 = (1/2)*double_dot(s, s)
 		I = np.eye(3)
+		s = stress - (1./3)*trace(stress)*I
+		J2 = (1/2)*double_dot(s, s)
 		# dQdS = -self.gamma*I + (0.5/np.sqrt(J2))*s
 		dQdS = -self.beta*I + (0.5/np.sqrt(J2))*s
 		return dQdS
@@ -963,14 +963,14 @@ class ViscoPlasticDruckerPrager(BaseSolution):
 
 			self.__compute_yield_function(stress_MPa)
 			
-			if self.Fvp <= 0:
+			if self.Fvp <= 0.0:
 				self.eps.append(self.eps[-1])
 				self.alphas.append(self.alpha)
 				self.Fvp_list.append(self.Fvp)
 			else:
 				tol = 1e-6
 				error = 2*tol
-				maxiter = 20
+				maxiter = 40
 				alpha_last = self.alpha
 				ite = 1
 				while error > tol and ite < maxiter:
@@ -995,8 +995,11 @@ class ViscoPlasticDruckerPrager(BaseSolution):
 				self.alphas.append(self.alpha)
 				self.Fvp_list.append(self.Fvp)
 
-			print(self.Fvp, self.qsi, self.alpha_0)
-			# print(self.Fvp, self.alpha, self.alpha_0, self.alpha_1, self.qsi)
+			lmda = (self.Fvp/self.tau)
+
+			# print(self.Fvp, self.qsi, self.alpha_0)
+			print(lmda, self.Fvp, self.alpha, self.qsi)
+			# print("| " + "(%i) | (%.4e) | (%.4e) | (%.4e) | (%.4e) | (%.4e, %.4e, %.4e) |"%(ite, lmbda, Fvp_avg, alpha_avg, qsi_avg, stress_e[0], stress_e[2], stress_e[3]))
 		self.eps = np.array(self.eps)
 		self.alphas = np.array(self.alphas)
 
