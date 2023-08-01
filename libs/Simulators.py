@@ -108,7 +108,7 @@ def H2CaveSimulator(input_model, input_bc, grid=None):
 	from BoundaryConditions import MechanicsBoundaryConditions
 	from Simulators import Simulator
 	from Models import MaxwellModel, BurgersModel, ElasticModel, ViscoelasticModel
-	from Elements import DashpotElement, DislocationCreep, PressureSolutionCreep, Damage, ViscoplasticDesaiElement
+	from Elements import DashpotElement, DislocationCreep, PressureSolutionCreep, Damage, ViscoplasticDesaiElement, ViscoplasticDruckerPragerElement
 	from Utils import sec, save_json
 
 	# Define folders
@@ -152,6 +152,7 @@ def H2CaveSimulator(input_model, input_bc, grid=None):
 					"DislocationCreep": DislocationCreep,
 					"PressureSolutionCreep": PressureSolutionCreep,
 					"ViscoplasticDesai": ViscoplasticDesaiElement,
+					"ViscoPlasticDruckerPrager": ViscoplasticDruckerPragerElement,
 					"Damage": Damage}
 	for element_name in inelastic_elements:
 		model.add_inelastic_element(ELEMENT_DICT[element_name](fem_handler, input_model, element_name=element_name))
@@ -226,6 +227,22 @@ def H2CaveSimulator(input_model, input_bc, grid=None):
 			avg_alpha_saver = AverageScalerSaver(fem_handler.dx(), "alpha", model.inelastic_elements[i_desai].alpha, time_handler, output_folder)
 			sim.add_event(avg_alpha_saver)
 
+	# If Drucker-Prager viscoplastic model is included, save Fvp and alpha fields
+	if "ViscoPlasticDruckerPrager" in inelastic_elements:
+		i_dp = inelastic_elements.index("ViscoPlasticDruckerPrager")
+		if input_model["Elements"]["ViscoPlasticDruckerPrager"]["save_Fvp_vtk"] == True:
+			vtk_Fvp_saver = VtkSaver("Fvp", model.inelastic_elements[i_dp].F_vp, time_handler, output_folder)
+			sim.add_event(vtk_Fvp_saver)
+		if input_model["Elements"]["ViscoPlasticDruckerPrager"]["save_Fvp_avg"] == True:
+			avg_Fvp_saver = AverageScalerSaver(fem_handler.dx(), "Fvp", model.inelastic_elements[i_dp].F_vp, time_handler, output_folder)
+			sim.add_event(avg_Fvp_saver)
+		if input_model["Elements"]["ViscoPlasticDruckerPrager"]["save_alpha_vtk"] == True:
+			vtk_alpha_saver = VtkSaver("alpha", model.inelastic_elements[i_dp].alpha, time_handler, output_folder)
+			sim.add_event(vtk_alpha_saver)
+		if input_model["Elements"]["ViscoPlasticDruckerPrager"]["save_alpha_avg"] == True:
+			avg_alpha_saver = AverageScalerSaver(fem_handler.dx(), "alpha", model.inelastic_elements[i_dp].alpha, time_handler, output_folder)
+			sim.add_event(avg_alpha_saver)
+
 	# If damage model is included, save damage field
 	if "Damage" in inelastic_elements:
 		i_damage = inelastic_elements.index("Damage")
@@ -287,6 +304,12 @@ def SmpSimulator(input_model, input_bc):
 	import numpy as np
 	import os
 
+	def find_index_of_object_type(lst, target_type):
+		for index, item in enumerate(lst):
+			if isinstance(item, target_type):
+				return index
+		return -1
+
 	# Output folder
 	output_folder = input_model["Paths"]["Output"]
 
@@ -339,8 +362,7 @@ def SmpSimulator(input_model, input_bc):
 
 	# Save internal parameters of Desai viscoplastic model
 	if "ViscoplasticDesai" in input_model["Model"]:
-		print(input_model["Model"])
-		index = input_model["Model"].index("ViscoplasticDesai")
+		index = find_index_of_object_type(model_elements, ViscoplasticDesai)
 		element = model_elements[index]
 		if input_model["Elements"]["ViscoplasticDesai"]["save_Fvp_smp"] == True:
 			saver_Fvp = TensorSaver(output_folder, "Fvp")
@@ -356,7 +378,7 @@ def SmpSimulator(input_model, input_bc):
 	# Save internal parameters of Durcker-Prager viscoplastic model
 	if "ViscoPlasticDruckerPrager" in input_model["Model"]:
 		print(input_model["Model"])
-		index = input_model["Model"].index("ViscoPlasticDruckerPrager")
+		index = find_index_of_object_type(model_elements, ViscoPlasticDruckerPrager)
 		element = model_elements[index]
 		if input_model["Elements"]["ViscoPlasticDruckerPrager"]["save_Fvp_smp"] == True:
 			saver_Fvp = TensorSaver(output_folder, "Fvp")
