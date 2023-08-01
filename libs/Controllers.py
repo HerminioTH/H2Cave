@@ -36,7 +36,7 @@ class IterationController(Controller):
 		return self.variable < self.max_ite
 
 class ErrorController(Controller):
-	def __init__(self, name, model, tol=1e-9):
+	def __init__(self, name, model, tol=1e-12):
 		super().__init__(name)
 		self.model = model
 		self.tol = tol
