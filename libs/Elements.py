@@ -845,11 +845,11 @@ class ViscoplasticVonMisesElement(BaseElement):
 
 		self.eps_ie_rate.vector()[:] = strain_rates_array.flatten()
 
-		# Fvp_ind_min, Fvp_min, Fvp_ind_max, Fvp_max, n_elems, Fvp_avg = self.__compute_min_max_avg(self.Fvp_array)
-		# alpha_ind_min, alpha_min, alpha_ind_max, alpha_max, n_elems, alpha_avg = self.__compute_min_max_avg(self.alpha_array)
-		# stress_e = self.__get_tensor_at_element(stress, Fvp_ind_min)
+		Fvp_ind_min, Fvp_min, Fvp_ind_max, Fvp_max, n_elems, Fvp_avg = self.__compute_min_max_avg(self.Fvp_array)
+		alpha_ind_min, alpha_min, alpha_ind_max, alpha_max, n_elems, alpha_avg = self.__compute_min_max_avg(self.alpha_array)
+		stress_e = self.__get_tensor_at_element(stress_vec, Fvp_ind_min)
+		print("| " + "(%i, %.4e) | (%.4e) | (%.4e, %.4e) |"%(Fvp_ind_min, Fvp_min, self.alpha_array[Fvp_ind_min], stress_e[0], stress_e[2]))
 
-		# # print("| " + "(%i, %.4e) | (%.4e) | (%.4e, %.4e) |"%(Fvp_ind_min, Fvp_min, self.alpha_array[Fvp_ind_min], stress_e[0], stress_e[2]))
 		# print("| " + "(%.4e %.4e %.4e) | (%.4e %.4e %.4e) |"%(strain_rate[0,0], strain_rate[1,1], strain_rate[2,2], stress_e[0], stress_e[1], stress_e[2]))
 
 		# self.update_hardening_parameters()
@@ -1442,3 +1442,203 @@ class ViscoplasticDesaiElement(BaseElement):
 		self.dQdSxz = sy.lambdify(variables, sy.diff(Qvp, s_xz), "numpy")
 		self.dQdSyz = sy.lambdify(variables, sy.diff(Qvp, s_yz), "numpy")
 
+
+		
+
+
+class ViscoplasticDruckerPragerElement(BaseElement):
+	def __init__(self, fem_handler, input_model, element_name="ViscoPlasticDruckerPrager"):
+		super().__init__(fem_handler)
+		self.element_name = element_name
+		self.theta = input_model["Time"]["theta"]
+		self.__load_props(input_model)
+		self.__initialize_fields()
+
+	def build_A(self):
+		pass
+
+	def build_b(self, C):
+		b_form = inner(sigma(C, self.eps_ie), epsilon(self.v))*self.dx
+		self.b = assemble(b_form)
+
+	def update(self):
+		self.eps_ie_old.assign(self.eps_ie)
+		self.eps_ie_rate_old.assign(self.eps_ie_rate)
+		self.update_hardening_parameters()
+
+	def update_hardening_parameters(self):
+		self.F_vp.vector()[:] = self.Fvp_array
+		self.alpha.vector()[:] = self.alpha_array
+		self.qsi.vector()[:] = self.qsi_array
+
+	def compute_viscous_strain(self, stress, dt):
+		self.__compute_viscous_strain_rate(stress, dt)
+		self.eps_ie.assign(local_projection(self.eps_ie_old + dt*(self.theta*self.eps_ie_rate_old + (1 - self.theta)*self.eps_ie_rate), self.TS))
+
+	def __compute_strain_rate(self, stress_elem, alpha_elem, Fvp_elem):
+		flow_direction = self.compute_dQdS_at_element(stress_elem, alpha_elem)
+		strain_rate = (Fvp_elem/self.tau)*flow_direction
+		return strain_rate
+
+	def __compute_viscous_strain_rate(self, stress, dt):
+		# self.compute_yield_surface(stress)
+		n_elems = self.alpha.vector()[:].size
+
+		# Extract arrays from element fields (DG)
+		stress_vec = stress.vector()[:]/MPa
+
+		strain_rates_array = np.zeros((n_elems, 3, 3))
+
+		# Loop over elements
+		for e in range(n_elems):
+
+			# Get element values
+			qsi_elem = self.__get_scalar_at_element(self.qsi, e)
+			stress_elem = self.__get_tensor_at_element(stress_vec, e)
+			alpha_elem = self.__get_scalar_at_element(self.alpha, e)
+			Fvp_elem = self.compute_Fvp_at_element(stress_elem, alpha_elem)
+
+			# Initialize viscoplastic strain rate
+			strain_rate = np.zeros((3,3))
+
+			if Fvp_elem > 0.0:
+				tol = 1e-12
+				error = 2*tol
+				maxiter = 200
+				ite = 1
+
+				qsi_old = qsi_elem
+				Fvp_elem_last = Fvp_elem
+				alpha_last = alpha_elem
+
+				while error > tol and ite < maxiter:
+
+					# Compute yield function
+					Fvp_elem = self.compute_Fvp_at_element(stress_elem, alpha_elem)
+					
+					# Compute viscoplastic strain rate
+					strain_rate = self.__compute_strain_rate(stress_elem, alpha_elem, Fvp_elem)
+
+					# Compute qsi
+					increment = double_dot(strain_rate, strain_rate)**0.5*dt
+					qsi_elem = qsi_old + increment
+
+					# Update alpha
+					alpha_elem = self.__apply_hardening_rule(qsi_elem)
+
+					# Compute error
+					error = abs(alpha_elem - alpha_last)
+					alpha_last = alpha_elem
+
+					# Iteration control
+					ite += 1
+
+			self.Fvp_array[e] = Fvp_elem
+			self.alpha_array[e] = alpha_elem
+			self.qsi_array[e] = qsi_elem
+
+			strain_rates_array[e] = strain_rate
+
+		self.eps_ie_rate.vector()[:] = strain_rates_array.flatten()
+
+		# Fvp_ind_min, Fvp_min, Fvp_ind_max, Fvp_max, n_elems, Fvp_avg = self.__compute_min_max_avg(self.Fvp_array)
+		# alpha_ind_min, alpha_min, alpha_ind_max, alpha_max, n_elems, alpha_avg = self.__compute_min_max_avg(self.alpha_array)
+		# qsi_ind_min, qsi_min, qsi_ind_max, qsi_max, n_elems, qsi_avg = self.__compute_min_max_avg(self.qsi_array)
+		# stress_e = self.__get_tensor_at_element(stress_vec, Fvp_ind_min)
+		# try:
+		# 	print("| " + "(%i) | (%.4e) | (%.4e) | (%.4e) | (%.4e) | (%.4e, %.4e, %.4e) |"%(ite, lmbda, Fvp_avg, alpha_avg, qsi_avg, stress_e[0], stress_e[2], stress_e[3]))
+		# except:
+		# 	pass
+
+
+	def __apply_hardening_rule(self, qsi):
+		alpha = self.alpha_0
+		alpha += self.alpha_1*(1 - np.exp(-self.k1*qsi))
+		alpha += self.alpha_2*(1 - np.exp(-self.k2*qsi))
+		return alpha
+
+
+	def __compute_min_max_avg(self, vec):
+		ind_min = np.argmin(vec)
+		ind_max = np.argmax(vec)
+		n_elems = len(vec)
+		return ind_min, vec.min(), ind_max, vec.max(), n_elems, np.average(vec)
+
+	def __get_tensor_at_element(self, tensor_field, elem):
+		ids = [9*elem+0, 9*elem+4, 9*elem+8, 9*elem+1, 9*elem+2, 9*elem+5]
+		# tensor_elem_filtered = np.where(np.abs(tensor_elem) < 1e-1, 0, tensor_elem)
+		cutoff = np.linalg.norm(tensor_field[ids])/100
+		# print(cutoff)
+
+		tensor_elem_filtered = np.where(np.abs(tensor_field[ids]) < cutoff, 0, tensor_field[ids])
+		# tensor_elem_filtered = np.where(np.abs(tensor_field[ids]) < 1e-1, 0, tensor_field[ids])
+		# tensor_elem_filtered = tensor_field[ids]
+		# tensor_elem_filtered = [0.0, 0.0, 18.7, 0.0, 0.0, 0.0]
+		return tensor_elem_filtered
+
+	def __get_scalar_at_element(self, scalar_field, elem):
+		return scalar_field.vector()[elem]
+
+	def __load_props(self, settings):
+		self.c = settings["Elements"][self.element_name]["c"]
+		self.theta_deg = settings["Elements"][self.element_name]["theta_deg"]
+		self.alpha_1 = settings["Elements"][self.element_name]["alpha_1"]
+		self.alpha_2 = settings["Elements"][self.element_name]["alpha_2"]
+		self.k1 = settings["Elements"][self.element_name]["k1"]
+		self.k2 = settings["Elements"][self.element_name]["k2"]
+		self.beta = settings["Elements"][self.element_name]["beta"]
+		self.tau = settings["Elements"][self.element_name]["tau"]
+
+	def __initialize_fields(self):
+		zero_tensor = Expression((("0.0","0.0","0.0"), ("0.0","0.0","0.0"), ("0.0","0.0","0.0")), degree=0)
+		self.eps_ie = local_projection(zero_tensor, self.TS)
+		self.eps_ie_old = local_projection(zero_tensor, self.TS)
+		self.eps_ie_rate = local_projection(zero_tensor, self.TS)
+		self.eps_ie_rate_old = local_projection(zero_tensor, self.TS)
+		
+		self.theta_rad = np.radians(self.theta_deg)
+		self.gamma = np.sin(self.theta_rad)*( 1/(3**0.5*(3 + np.sin(self.theta_rad))) + 1/(3**0.5*(3 - np.sin(self.theta_rad))) )
+		self.alpha_0 = 3*self.c*np.cos(self.theta_rad)*( 1/(3**0.5*(3 + np.sin(self.theta_rad))) + 1/(3**0.5*(3 - np.sin(self.theta_rad))) )
+
+		alpha_scalar = Expression("A", A=self.alpha_0, degree=0)
+		self.alpha = local_projection(alpha_scalar, self.P0)
+
+		self.qsi = local_projection(Expression("0.0", degree=0), self.P0)
+		self.F_vp = local_projection(Expression("0.0", degree=0), self.P0)
+
+		# Get number of elements
+		n_elems = len(self.F_vp.vector()[:])
+
+		self.Fvp_array = np.zeros(n_elems)
+		self.alpha_array = np.zeros(n_elems)
+		self.qsi_array = np.zeros(n_elems)
+
+	def compute_Fvp_at_element(self, stress_MPa, alpha):
+		w = 1
+		s_xx = w*stress_MPa[0]
+		s_yy = w*stress_MPa[1]
+		s_zz = w*stress_MPa[2]
+		s_xy = w*stress_MPa[3]
+		s_xz = w*stress_MPa[4]
+		s_yz = w*stress_MPa[5]
+
+		I1 = s_xx + s_yy + s_zz
+		I2 = s_xx*s_yy + s_yy*s_zz + s_xx*s_zz - s_xy**2 - s_yz**2 - s_xz**2
+		J2 = (1/3)*I1**2 - I2
+		# print(I1, J2)
+
+		F = -self.gamma*I1 + np.sqrt(J2) - alpha
+		return F
+
+	def compute_dQdS_at_element(self, stress_MPa, alpha):
+		sigma = np.array([
+			[stress_MPa[0], stress_MPa[3], stress_MPa[4]],
+			[stress_MPa[3], stress_MPa[1], stress_MPa[5]],
+			[stress_MPa[4], stress_MPa[5], stress_MPa[2]]
+		])
+		I = np.eye(3)
+		s = sigma - (1./3)*np.trace(sigma)*I
+		J2 = (1/2)*double_dot(s, s)
+		dQdS = -self.beta*I + (0.5/np.sqrt(J2))*s
+		# dQdS = (0.5/np.sqrt(J2))*s
+		return dQdS
