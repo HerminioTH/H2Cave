@@ -376,8 +376,8 @@ class Damage(BaseElement):
 		von_Mises = sqrt((3/2.)*inner(s, s))
 		sigma_eq = von_Mises*((1 + self.nu + 3*(1 - 2*self.nu)*(sigma_m/von_Mises)**2)*2/3)**0.5
 		self.compute_damage(sigma_eq, dt)
-		aux = self.D.vector()[:]
-		print(aux.min(), aux.max(), np.mean(aux))
+		# aux = self.D.vector()[:]
+		# print(aux.min(), aux.max(), np.mean(aux))
 		self.eps_ie_rate.assign(local_projection(self.A*(von_Mises**(self.n-1))*s/((1 - self.D)**self.n), self.TS))
 
 	def compute_damage(self, sigma_eq, dt):

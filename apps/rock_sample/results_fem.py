@@ -27,9 +27,10 @@ def apply_grey_theme(fig, axes, transparent=True):
 
 def plot_model(axis, folder):
 	skip = 1
-	eps_files = ["eps_tot", "eps_e", "eps_ve", "eps_cr_dis", "eps_cr_sol", "eps_damage"]
-	eps_names = [r"$\varepsilon_{tot}$", r"$\varepsilon_{e}$", r"$\varepsilon_{ve}$", r"$\varepsilon_{cr}$", r"$\varepsilon_{ps}$", r"$\varepsilon_{d}$"]
-	color_names = ["steelblue", "orange", "lightcoral", "violet", "dodgerblue", "mediumseagreen"]
+	eps_files = ["eps_tot", "eps_e", "eps_ve", "eps_cr_dis", "eps_cr_sol", "eps_damage", "eps_vp", "eps_vp_dp"]
+	eps_names = [r"$\varepsilon_{tot}$", r"$\varepsilon_{e}$", r"$\varepsilon_{ve}$", r"$\varepsilon_{cr}$",
+				 r"$\varepsilon_{ps}$", r"$\varepsilon_{d}$", r"$\varepsilon_{vp}$", r"$\varepsilon_{vp}$ (D-P)"]
+	color_names = ["steelblue", "orange", "lightcoral", "violet", "dodgerblue", "mediumseagreen", "tomato", "purple"]
 
 	for eps_file, eps_name, color_name in zip(eps_files, eps_names, color_names):
 		try:
@@ -45,7 +46,7 @@ def plot_model(axis, folder):
 	axis[0].set_xlabel("Time (hours)", size=12, fontname="serif")
 	axis[0].set_ylabel("Axial strain (%)", size=12, fontname="serif")
 	axis[0].grid(True)
-	axis[0].legend(bbox_to_anchor=(2.65, 1.0), shadow=True, fancybox=True, ncol=1)
+	axis[0].legend(bbox_to_anchor=(2.8, 1.0), shadow=True, fancybox=True, ncol=1)
 
 	axis[1].set_xlabel("Time (hours)", size=12, fontname="serif")
 	axis[1].set_ylabel("Radial strain (%)", size=12, fontname="serif")
@@ -53,7 +54,7 @@ def plot_model(axis, folder):
 
 def main():
 	fig, axis = plt.subplots(1, 2, figsize=(8, 3))
-	fig.subplots_adjust(top=0.975, bottom=0.155, left=0.085, right=0.875, hspace=0.2, wspace=0.32)
+	fig.subplots_adjust(top=0.975, bottom=0.155, left=0.060, right=0.840, hspace=0.2, wspace=0.32)
 
 	results_folder = os.path.join("output", "case_0", "fem", "avg")
 	plot_model(axis, results_folder)

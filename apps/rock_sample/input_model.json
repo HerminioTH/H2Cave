@@ -11,6 +11,7 @@
         "KelvinVoigt",
         "DislocationCreep",
         "PressureSolutionCreep",
+        "ViscoPlasticDruckerPrager",
         "Damage"
     ],
     "Element_names (this is not read by the program)": [
@@ -20,7 +21,7 @@
         "DislocationCreep",
         "Damage",
         "PressureSolutionCreep",
-        "ViscoplasticDesai"
+        "ViscoPlasticDruckerPrager"
     ],
     "Elements": {
         "Spring": {
@@ -40,7 +41,7 @@
             "total_strain_name": "eps_tot"
         },
         "KelvinVoigt": {
-            "E": 1030000000.0,
+            "E": 5030000000.0,
             "nu": 0.3,
             "eta": 450000000000000.0,
             "save_strain_smp": true,
@@ -88,24 +89,25 @@
             "save_damage_vtk": true,
             "damage_name": "damage_field"
         },
-        "ViscoplasticDesai": {
-            "F_0": 1.0,
-            "mu_1": 4e-11,
-            "N_1": 1.0,
-            "n": 3,
-            "a_1": 0.00195,
-            "eta": 0.65,
-            "beta_1": 0.0012,
-            "beta": -0.995,
-            "m": -0.5,
-            "gamma": 0.2325,
-            "alpha_0": 0.009,
-            "k_v": 0.275,
-            "sigma_t": 5.4,
+        "ViscoPlasticDruckerPrager": {
+            "c": 1.0,
+            "theta_deg": 30,
+            "alpha_1": 16.0,
+            "alpha_2": 0.0,
+            "k1": 65.0,
+            "k2": 48.0,
+            "beta": -3.6e-2,
+            "tau": 9.1e7,
             "save_strain_smp": true,
+            "save_alpha_smp": true,
+            "save_Fvp_smp": true,
+            "save_alpha_avg": true,
+            "save_Fvp_avg": true,
             "save_strain_avg": true,
-            "save_strain_vtk": true,
-            "strain_name": "eps_vp"
+            "save_strain_vtk": false,
+            "save_alpha_vtk": false,
+            "save_Fvp_vtk": false,
+            "strain_name": "eps_vp_dp"
         }
     }
 }
