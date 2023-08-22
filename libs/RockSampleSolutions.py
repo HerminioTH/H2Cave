@@ -659,7 +659,8 @@ class ViscoplasticDesai2(BaseSolution):
 			F1 = (-self.alpha*I1_star**self.n + self.gamma*I1_star**2)
 			F2 = (np.exp(self.beta_1*I1_star) - self.beta*Sr)**self.m
 			self.Fvp = J2 - F1*F2
-			print(I1_star, I1, J2, F2, F1)
+			# print(I1_star, I1, J2, F2, F1)
+			print(self.alpha*I1_star**self.n, self.alpha, I1_star, self.n)
 
 	def evaluate_flow_direction(self, stress_MPa, alpha_q):
 		s_xx = stress_MPa[0]
@@ -902,7 +903,7 @@ class ViscoPlasticDruckerPrager(BaseSolution):
 	def __init__(self, input_model, input_bc):
 		super().__init__(input_bc)
 		self.__load_properties(input_model)
-		self.__initialize_variables()
+		
 
 	def __initialize_variables(self):
 		self.gamma = np.sin(self.theta_rad)*( 1/(3**0.5*(3 + np.sin(self.theta_rad))) + 1/(3**0.5*(3 - np.sin(self.theta_rad))) )
@@ -913,6 +914,7 @@ class ViscoPlasticDruckerPrager(BaseSolution):
 		self.qsi_old = 0
 		self.Fvp = 0
 		self.Fvp_list = [0]
+		self.eps = [np.zeros((3,3))]
 
 	def __load_properties(self, input_model):
 		self.c = input_model["Elements"]["ViscoPlasticDruckerPrager"]["c"]
@@ -955,8 +957,7 @@ class ViscoPlasticDruckerPrager(BaseSolution):
 		self.alpha += self.alpha_2*(1 - np.exp(-self.k2*self.qsi))
 
 	def compute_strains(self):
-		self.eps = [np.zeros((3,3))]
-		self.qsi = 0
+		self.__initialize_variables()
 		for i in range(1, len(self.time_list)):
 			dt = self.time_list[i] - self.time_list[i-1]
 			stress_MPa = self.sigmas[i,:].copy()/MPa
@@ -970,7 +971,7 @@ class ViscoPlasticDruckerPrager(BaseSolution):
 			else:
 				tol = 1e-6
 				error = 2*tol
-				maxiter = 40
+				maxiter = 20
 				alpha_last = self.alpha
 				ite = 1
 				while error > tol and ite < maxiter:
@@ -986,8 +987,8 @@ class ViscoPlasticDruckerPrager(BaseSolution):
 					self.__compute_yield_function(stress_MPa)
 
 					ite += 1
-					if ite >= maxiter:
-						print(f"Maximum number of iterations ({maxiter}) reached.")
+					# if ite >= maxiter:
+					# 	print(f"Maximum number of iterations ({maxiter}) reached.")
 
 
 				self.qsi_old = self.qsi
@@ -998,7 +999,7 @@ class ViscoPlasticDruckerPrager(BaseSolution):
 			lmda = (self.Fvp/self.tau)
 
 			# print(self.Fvp, self.qsi, self.alpha_0)
-			print(lmda, self.Fvp, self.alpha, self.qsi)
+			# print(lmda, self.Fvp, self.alpha, self.qsi)
 			# print("| " + "(%i) | (%.4e) | (%.4e) | (%.4e) | (%.4e) | (%.4e, %.4e, %.4e) |"%(ite, lmbda, Fvp_avg, alpha_avg, qsi_avg, stress_e[0], stress_e[2], stress_e[3]))
 		self.eps = np.array(self.eps)
 		self.alphas = np.array(self.alphas)

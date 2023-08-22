@@ -260,7 +260,7 @@ def H2CaveSimulator(input_model, input_bc, grid=None):
 
 	# Build controllers
 	if type(model) == MaxwellModel or type(model) == BurgersModel:
-		iteration_controller = IterationController("Iterations", max_ite=50)
+		iteration_controller = IterationController("Iterations", max_ite=30)
 		error_controller = ErrorController("Error", model, tol=1e-6)
 		sim.add_controller(iteration_controller)
 		sim.add_controller(error_controller)

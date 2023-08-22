@@ -1498,13 +1498,15 @@ class ViscoplasticDruckerPragerElement(BaseElement):
 			alpha_elem = self.__get_scalar_at_element(self.alpha, e)
 			Fvp_elem = self.compute_Fvp_at_element(stress_elem, alpha_elem)
 
+			# print(e, Fvp_elem, alpha_elem)
+
 			# Initialize viscoplastic strain rate
 			strain_rate = np.zeros((3,3))
 
 			if Fvp_elem > 0.0:
 				tol = 1e-12
 				error = 2*tol
-				maxiter = 200
+				maxiter = 20
 				ite = 1
 
 				qsi_old = qsi_elem
@@ -1541,14 +1543,17 @@ class ViscoplasticDruckerPragerElement(BaseElement):
 
 		self.eps_ie_rate.vector()[:] = strain_rates_array.flatten()
 
-		# Fvp_ind_min, Fvp_min, Fvp_ind_max, Fvp_max, n_elems, Fvp_avg = self.__compute_min_max_avg(self.Fvp_array)
-		# alpha_ind_min, alpha_min, alpha_ind_max, alpha_max, n_elems, alpha_avg = self.__compute_min_max_avg(self.alpha_array)
-		# qsi_ind_min, qsi_min, qsi_ind_max, qsi_max, n_elems, qsi_avg = self.__compute_min_max_avg(self.qsi_array)
-		# stress_e = self.__get_tensor_at_element(stress_vec, Fvp_ind_min)
-		# try:
-		# 	print("| " + "(%i) | (%.4e) | (%.4e) | (%.4e) | (%.4e) | (%.4e, %.4e, %.4e) |"%(ite, lmbda, Fvp_avg, alpha_avg, qsi_avg, stress_e[0], stress_e[2], stress_e[3]))
-		# except:
-		# 	pass
+		Fvp_ind_min, Fvp_min, Fvp_ind_max, Fvp_max, n_elems, Fvp_avg = self.__compute_min_max_avg(self.Fvp_array)
+		alpha_ind_min, alpha_min, alpha_ind_max, alpha_max, n_elems, alpha_avg = self.__compute_min_max_avg(self.alpha_array)
+		qsi_ind_min, qsi_min, qsi_ind_max, qsi_max, n_elems, qsi_avg = self.__compute_min_max_avg(self.qsi_array)
+		stress_e = self.__get_tensor_at_element(stress_vec, Fvp_ind_max)
+		strain_e = strain_rates_array[Fvp_ind_max]
+		strain_norm = np.linalg.norm(strain_e)
+		print("| " + "(%.4e) | (%.4e) | (%.4e) | (%.4e) | (%.4e) | (%.4e) |"%(Fvp_min, Fvp_max, alpha_min, alpha_max, strain_norm, dt*strain_norm))
+		try:
+			print("| " + "(%i) | (%.4e) | (%.4e) | (%.4e) | (%.4e) | (%.4e, %.4e, %.4e) |"%(ite, lmbda, Fvp_avg, alpha_avg, qsi_avg, stress_e[0], stress_e[2], stress_e[3]))
+		except:
+			pass
 
 
 	def __apply_hardening_rule(self, qsi):
